@@ -3,7 +3,7 @@
 
 ### build syscall checker
 
-FROM golang:1.18-alpine3.15 as init-builder
+FROM golang:1.19-alpine3.15 as init-builder
 WORKDIR /usr/src/KubeArmor
 COPY ./KubeArmor/BPF/tests/main.go main.go
 COPY ./KubeArmor/BPF/tests/go.mod go.mod
@@ -25,7 +25,7 @@ ENTRYPOINT ["/KubeArmor/compile.sh"]
 
 ### Builder
 
-FROM golang:1.18-alpine3.15 as builder
+FROM golang:1.19-alpine3.15 as builder
 
 RUN apk --no-cache update
 RUN apk add --no-cache bash git wget python3 linux-headers build-base clang clang-dev libc-dev llvm make gcc protobuf
