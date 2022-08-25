@@ -25,7 +25,7 @@ require (
 	github.com/containerd/typeurl v1.0.2
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/google/uuid v1.3.0
-	github.com/kubearmor/KubeArmor/protobuf v0.0.0-20211217093440-d99a1cb5f908
+	github.com/kubearmor/KubeArmor/protobuf 557eed6f971a
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/spf13/viper v1.8.1
 	go.uber.org/zap v1.19.0
