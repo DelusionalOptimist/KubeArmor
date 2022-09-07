@@ -10,7 +10,8 @@ if [ "$NAME" != "Ubuntu" ]; then
 fi
 
 OS="x${NAME}_${VERSION_ID}"
-VERSION=1.19
+VERSION=$(curl --silent https://api.github.com/repos/cri-o/cri-o/releases/latest | sed -n 's/.*"tag_name":\s\"v\(.*\).."\,/\1/p')
+echo "CRI-O Version: $VERSION"
 
 # get signing keys
 echo "deb [signed-by=/usr/share/keyrings/libcontainers-archive-keyring.gpg] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list

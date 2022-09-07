@@ -3,11 +3,11 @@ name: ci-test-local
 on:
   push:
     branches: [main]
-    paths:
-      - "KubeArmor/**"
-      - "tests/**"
-      - "protobuf/**"
-      - ".github/workflows/ci-test-local.yml"
+      #paths:
+      #- "KubeArmor/**"
+      #- "tests/**"
+      #- "protobuf/**"
+      #- ".github/workflows/ci-test-local.yml"
   pull_request:
     branches: [main]
     paths:
