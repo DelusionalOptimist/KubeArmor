@@ -10,7 +10,8 @@ if [ "$NAME" != "Ubuntu" ]; then
 fi
 
 OS="x${NAME}_${VERSION_ID}"
-VERSION=$(curl --silent https://api.github.com/repos/cri-o/cri-o/releases/latest | sed -n 's/.*"tag_name":\s\"v\(.*\).."\,/\1/p')
+#VERSION=$(curl --silent https://api.github.com/repos/cri-o/cri-o/releases/latest | sed -n 's/.*"tag_name":\s\"v\(.*\).."\,/\1/p')
+VERSION=1.23
 echo "CRI-O Version: $VERSION"
 
 # get signing keys
