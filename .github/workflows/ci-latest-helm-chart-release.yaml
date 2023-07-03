@@ -10,7 +10,7 @@ jobs:
   publish-chart:
     name: Update Stable Helm Chart With Latest Changes
       #if: ${{ (github.repository == 'kubearmor/kubearmor') && (!contains(github.event.head_commit.message, '[Automated]')) }}
-    if: ${{ (github.repository == 'delusionaloptimist/kubearmor') && (!contains(github.event.head_commit.message, '[Automated]')) }}
+    if: ${{ (github.repository == 'delusionaloptimist/kubearmor') }}
     runs-on: ubuntu-20.04
     permissions:
       contents: write
@@ -34,7 +34,9 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           charts_dir: deployments
           # repo where charts would be published
-          owner: kubearmor
+          #owner: kubearmor
+          owner: delusionaloptimist
           repository: charts
           branch: gh-pages
-          charts_url: https://kubearmor.github.io/charts
+            #charts_url: https://kubearmor.github.io/charts
+          charts_url: https://delusionaloptimist.github.io/charts
