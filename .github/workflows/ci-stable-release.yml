@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "STABLE-RELEASE"
-      # - ".github/workflows/ci-stable-release.yml"
+      - ".github/workflows/ci-stable-release.yml"
 
 jobs:
   push-stable-version:
