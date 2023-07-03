@@ -55,7 +55,7 @@ jobs:
           sed -i -e "s/version:.*/version: $STABLE_VERSION/g" deployments/helm/Chart.yaml
           echo "STABLE_VERSION=$STABLE_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create PR to update chart version on kubearmor/main
+      - name: Update Helm chart version in KubeArmor repo
         uses: peter-evans/create-pull-request@v5
         with:
           branch: update-helm-${{ steps.update.outputs.STABLE_VERSION }}
