@@ -35,5 +35,7 @@ jobs:
           # repo where charts would be published
           owner: kubearmor
           repository: charts
-          branch: gh-pages
+          branch: main
           charts_url: https://kubearmor.github.io/charts
+          commit_username: "github-actions[bot]"
+          commit_email: "github-actions[bot]@users.noreply.github.com"
