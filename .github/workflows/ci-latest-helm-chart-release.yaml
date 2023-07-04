@@ -33,7 +33,11 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           charts_dir: deployments
           # repo where charts would be published
-          owner: kubearmor
+          #owner: kubearmor
+          owner: delusionaloptimist
           repository: charts
           branch: gh-pages
-          charts_url: https://kubearmor.github.io/charts
+            #charts_url: https://kubearmor.github.io/charts
+          charts_url: https://delusionaloptimist.github.io/charts
+          commit_username: "github-actions[bot]"
+          commit_email: "github-actions[bot]@users.noreply.github.com"
