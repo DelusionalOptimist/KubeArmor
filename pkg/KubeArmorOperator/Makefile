@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2021 Authors of KubeArmor
 
-CURDIR := $(shell pwd)
+CURDIR     := $(shell pwd)
+DEPLOYDIR := $(realpath $(CURDIR)/../../deployments)
+CHARTDIR  := $(realpath $(DEPLOYDIR)/helm/KubeArmorOperator)
+CRDDIR    := $(realpath $(CHARTDIR)/crds)
 
 # Image URL to use all building/pushing image targets
 IMG ?= kubearmor/kubearmor-operator
@@ -119,8 +122,8 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 .PHONY: manifests
 manifests: controller-gen kustomize## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	go mod tidy; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	rm -r deployments/helm/crds/* && cp config/crd/bases/* deployments/helm/crds/	
-	$(KUSTOMIZE) build config/default | tee deployments/operator.yaml
+	rm -r $(CRDDIR)/* && cp config/crd/bases/* $(CRDDIR)/
+	$(KUSTOMIZE) build config/default | tee $(DEPLOYDIR)/operator.yaml
 	
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
