@@ -2,8 +2,8 @@ name: ci-test-controllers
 
 on:
   pull_request:
-    branches:
-      - "main"
+    #branches:
+    #  - "main"
     paths:
       - "pkg/**"
       - ".github/workflows/ci-test-controllers.yml"

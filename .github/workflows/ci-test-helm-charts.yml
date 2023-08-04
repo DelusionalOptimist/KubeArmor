@@ -2,7 +2,7 @@ name: ci-test-helm-charts
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
     paths:
       - "deployments/helm/**"
       - ".github/workflows/ci-test-helm-charts.yml"

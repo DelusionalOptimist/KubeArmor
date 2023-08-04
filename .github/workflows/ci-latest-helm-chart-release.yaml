@@ -2,7 +2,7 @@ name: ci-latest-helm-chart-release
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
     paths:
       - "deployments/helm/**"
 
