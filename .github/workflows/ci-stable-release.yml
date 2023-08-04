@@ -38,7 +38,7 @@ jobs:
 
   update-helm-chart:
     name: Update KubeArmor Helm chart version
-    if: github.repository == 'kubearmor/kubearmor'
+      #if: github.repository == 'kubearmor/kubearmor'
     runs-on: ubuntu-20.04
     timeout-minutes: 20
     permissions:
