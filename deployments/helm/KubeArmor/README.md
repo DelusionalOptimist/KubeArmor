@@ -1,6 +1,5 @@
 ## Install KubeArmor
 Install KubeArmor using Helm chart repo. Also see [values](#Values) for your respective environment.
-Nice.
 ```
 helm repo add kubearmor https://kubearmor.github.io/charts
 helm repo update kubearmor
