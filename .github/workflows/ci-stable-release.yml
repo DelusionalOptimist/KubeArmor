@@ -2,7 +2,7 @@ name: ci-stable-release
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
     paths:
       - "STABLE-RELEASE"
     #  - ".github/workflows/ci-stable-release.yml"
