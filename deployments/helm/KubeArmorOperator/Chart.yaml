@@ -2,6 +2,7 @@ apiVersion: v2
 name: kubearmor-operator
 description: A Helm chart for kubearmor operator
 # A chart can be either an 'application' or a 'library' chart.
+# nice
 #
 # Application charts are a collection of templates that can be packaged into versioned archives
 # to be deployed.
