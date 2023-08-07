@@ -46,6 +46,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: operator-helm-updates
 
       - name: Update Chart.yaml
         id: update

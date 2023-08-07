@@ -15,6 +15,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: operator-helm-updates
 
       - uses: azure/setup-helm@v3
         with:
