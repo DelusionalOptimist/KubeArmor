@@ -70,6 +70,7 @@ jobs:
           committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
           title: "[skip ci] Update Helm Chart To ${{ steps.update.outputs.STABLE_VERSION }}"
-          base: main
+            #base: main
+          base: operator-helm-updates
           signoff: true
           delete-branch: true
