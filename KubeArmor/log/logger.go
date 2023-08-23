@@ -32,7 +32,7 @@ func customTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 // initLogger Function
 func initLogger() {
 	defaultConfig := []byte(`{
-		"level": "debug",
+		"level": "info",
 		"encoding": "console",
 		"outputPaths": ["stdout"],
 		"encoderConfig": {

@@ -38,6 +38,12 @@ type Container struct {
 
 	// == //
 
+	ProtocolPort string `json:"protocolPort,omitempty"`
+	Status       string `json:"status,omitempty"`
+	ContainerIP  string `json:"container_ip,omitmempty"`
+
+	// == //
+
 	PolicyEnabled int `json:"policyEnabled"`
 
 	ProcessVisibilityEnabled      bool `json:"processVisibilityEnabled"`

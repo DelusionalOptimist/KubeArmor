@@ -55,7 +55,9 @@ run: build
 .PHONY: run-container
 run-container: build
 	cd $(CURDIR); sudo rm -f /tmp/kubearmor.log
-	cd $(CURDIR); sudo -E ./kubearmor -logPath=/tmp/kubearmor.log -enableKubeArmorHostPolicy -enableKubeArmorPolicy -k8s=false
+	cd $(CURDIR)/BPF; make clean
+	cd $(CURDIR)/BPF; make
+	cd $(CURDIR); sudo -E ./kubearmor -stateAgentAddr="localhost:8801" -logPath=/tmp/kubearmor.log -enableKubeArmorHostPolicy -enableKubeArmorPolicy -k8s=false -enableStateAgent=true
 
 .PHONY: run-host-only
 run-host-only: build

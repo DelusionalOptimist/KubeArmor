@@ -375,6 +375,12 @@ func IsK8sEnv() bool {
 	return false
 }
 
+// IsECSEnv Function
+func IsECSEnv() bool {
+	_, ok := os.LookupEnv("ECS_CONTAINER_METADATA_URI_V4")
+	return ok
+}
+
 // ContainerRuntimeSocketMap Structure
 var ContainerRuntimeSocketMap = map[string][]string{
 	"docker": {
