@@ -6,6 +6,7 @@ import (
 	"time"
 
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
+	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 	"google.golang.org/grpc"
@@ -38,7 +39,7 @@ func NewStateAgent(addr string) *StateAgent {
 	}
 
 	var podEntity string
-	if ok := kl.IsK8sEnv(); ok {
+	if ok := kl.IsK8sEnv(); ok && cfg.GlobalCfg.K8sEnv {
 		// pod == K8s pod
 		podEntity = "k8s"
 	} else if ok := kl.IsECSEnv(); ok {

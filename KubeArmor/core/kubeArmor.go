@@ -457,6 +457,23 @@ func KubeArmor() {
 
 	// == //
 
+	// Init StateAgent
+	if !dm.K8sEnabled && cfg.GlobalCfg.StateAgent {
+		// initialize state agent
+		if !dm.InitStateAgent() {
+			dm.Logger.Err("Failed to initialize State Agent Client")
+
+			// destroy the daemon
+			dm.DestroyKubeArmorDaemon()
+
+			return
+		}
+		dm.Logger.Print("Initialized State Agent Client")
+
+		// connect to state agent server
+		go dm.RunStateAgent()
+	}
+
 	// Containerized workloads with Host
 	if cfg.GlobalCfg.Policy || cfg.GlobalCfg.HostPolicy {
 		// initialize system monitor
@@ -713,27 +730,7 @@ func KubeArmor() {
 		dm.Logger.Print("Started to keep the connection to KVM Service")
 	}
 
-	// Init StateAgent
-	if cfg.GlobalCfg.StateAgent {
-		// initialize state agent
-		if !dm.InitStateAgent() {
-			dm.Logger.Err("Failed to initialize State Agent Client")
-
-			// destroy the daemon
-			dm.DestroyKubeArmorDaemon()
-
-			return
-		}
-		dm.Logger.Print("Initialized State Agent Client")
-
-		// connect to state agent server
-		go dm.RunStateAgent()
-
-		// wait for state agent client to init
-		time.Sleep(time.Second * 3)
-
-		go dm.StateAgent.PushNodeEvent(dm.Node, "added")
-	}
+	go dm.StateAgent.PushNodeEvent(dm.Node, "added")
 
 	// == //
 

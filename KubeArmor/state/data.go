@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
@@ -14,7 +13,6 @@ import (
 )
 
 var (
-	NodeIP = kl.GetExternalIPAddr()
 	StateEventCache = make(map[string]*pb.StateEvent)
 	//KubeArmorNamespaces = make(map[string][]string)
 )

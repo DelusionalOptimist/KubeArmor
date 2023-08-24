@@ -38,9 +38,9 @@ type Container struct {
 
 	// == //
 
-	ProtocolPort string `json:"protocolPort,omitempty"`
-	Status       string `json:"status,omitempty"`
-	ContainerIP  string `json:"container_ip,omitmempty"`
+	ProtocolPort string `json:"protocolPort"`
+	Status       string `json:"status"`
+	ContainerIP  string `json:"container_ip"`
 
 	// == //
 
