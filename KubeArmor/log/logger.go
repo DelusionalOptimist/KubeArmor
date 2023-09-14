@@ -6,6 +6,7 @@ package log
 
 import (
 	"encoding/json"
+	"os"
 	"time"
 
 	"go.uber.org/zap"
@@ -59,7 +60,10 @@ func initLogger() {
 	}
 
 	config.EncoderConfig.EncodeTime = customTimeEncoder
-	config.Level.SetLevel(zap.DebugLevel) // if we need to set log level
+
+	if val, ok := os.LookupEnv("DEBUG"); ok && val == "true" {
+		config.Level.SetLevel(zap.DebugLevel) // if we need to set log level
+	}
 
 	logger, err := config.Build()
 	if err != nil {

@@ -1,18 +1,8 @@
 syntax = "proto3";
- 
+
 package policy;
 
 option go_package="github.com/kubearmor/KubeArmor/protobuf";
-
-// Health check
-message HealthCheckReq {
-  int32 nonce = 1;
-}
-
-// healthcheck reply message
-message HealthCheckReply {
-  int32 Retval = 1;
-}
 
 message response {
     int32 status = 1;
@@ -27,8 +17,7 @@ service PolicyService {
     rpc hostPolicy (policy) returns (response);
 }
 
-service PolicyStreamService {
-    rpc HealthCheck(HealthCheckReq) returns (HealthCheckReply);
+service ReversePolicyService {
     rpc containerPolicy (stream response) returns (stream policy);
     rpc hostPolicy (stream response) returns (stream policy);
 }

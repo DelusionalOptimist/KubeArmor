@@ -46,7 +46,10 @@ type KubearmorConfig struct {
 	LsmOrder  []string // LSM order
 	BPFFsPath string   // path to the BPF filesystem
 
-	StateAgent bool // Enable/Disable State Agent Client
+	ReverseGRPCServer bool   // to enable/disable reverse grpc server
+	RelayServerURL    string // URL of relay server
+
+	StateAgent     bool   // Enable/Disable State Agent Client
 	StateAgentAddr string // Address to State Agent Server
 }
 
@@ -122,6 +125,12 @@ const LsmOrder string = "lsm"
 // BPFFsPath key
 const BPFFsPath string = "bpfFsPath"
 
+// ConfigReverseGRPCServer state agent key
+const ConfigReverseGRPCServer string = "enableReverseGRPC"
+
+// ConfigRelayServerURL Path key
+const ConfigRelayServerURL string = "relayServerURL"
+
 // ConfigStateAgent state agent key
 const ConfigStateAgent string = "enableStateAgent"
 
@@ -159,6 +168,9 @@ func readCmdLineParams() {
 	lsmOrder := flag.String(LsmOrder, "bpf,apparmor,selinux", "lsm preference order to use, available lsms [bpf, apparmor, selinux]")
 
 	bpfFsPath := flag.String(BPFFsPath, "/sys/fs/bpf", "Path to the BPF filesystem to use for storing maps")
+
+	reverseGRPCServer := flag.Bool(ConfigReverseGRPCServer, false, "enabling KubeArmor Reverse Log and Policy gRPC Service")
+	relayServerURLStr := flag.String(ConfigRelayServerURL, "http://localhost:2801/", "relay-server http URL listening for logs")
 
 	stateAgent := flag.Bool(ConfigStateAgent, false, "enabling KubeArmor State Agent client")
 	stateAgentAddr := flag.String(ConfigStateAgentAddr, "localhost:8801", "address of State Agent Server")
@@ -201,6 +213,9 @@ func readCmdLineParams() {
 	viper.SetDefault(LsmOrder, *lsmOrder)
 
 	viper.SetDefault(BPFFsPath, *bpfFsPath)
+
+	viper.SetDefault(ConfigReverseGRPCServer, *reverseGRPCServer)
+	viper.SetDefault(ConfigRelayServerURL, *relayServerURLStr)
 
 	viper.SetDefault(ConfigStateAgent, *stateAgent)
 	viper.SetDefault(ConfigStateAgentAddr, *stateAgentAddr)
@@ -281,6 +296,9 @@ func LoadConfig() error {
 	GlobalCfg.LsmOrder = strings.Split(viper.GetString(LsmOrder), ",")
 
 	GlobalCfg.BPFFsPath = viper.GetString(BPFFsPath)
+
+	GlobalCfg.ReverseGRPCServer = viper.GetBool(ConfigReverseGRPCServer)
+	GlobalCfg.RelayServerURL = viper.GetString(ConfigRelayServerURL)
 
 	GlobalCfg.StateAgent = viper.GetBool(ConfigStateAgent)
 	GlobalCfg.StateAgentAddr = viper.GetString(ConfigStateAgentAddr)

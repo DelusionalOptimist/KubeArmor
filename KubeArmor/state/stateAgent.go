@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubearmor/KubeArmor/KubeArmor/common"
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
@@ -20,19 +21,19 @@ type StateAgent struct {
 
 	StateAgentAddr string
 
-	Running bool
+	Running   bool
 	PodEntity string
 
 	SAClient *StateAgentClient
 }
 
 type StateAgentClient struct {
-	Conn *grpc.ClientConn
+	Conn   *grpc.ClientConn
 	Client pb.StateAgent_StateAgentClient
 }
 
 func NewStateAgent(addr string) *StateAgent {
-	host, port, err := ParseURL(addr)
+	host, port, err := common.ParseURL(addr)
 	if err != nil {
 		kg.Err("Error while parsing State Agent URL")
 		return nil
@@ -53,9 +54,9 @@ func NewStateAgent(addr string) *StateAgent {
 
 	sm := &StateAgent{
 		StateAgentAddr: fmt.Sprintf("%s:%s", host, port),
-		StateEvents: make(chan *pb.StateEvent),
-		Running: true,
-		PodEntity: podEntity,
+		StateEvents:    make(chan *pb.StateEvent),
+		Running:        true,
+		PodEntity:      podEntity,
 	}
 
 	return sm
@@ -75,7 +76,7 @@ func (sm *StateAgent) RunStateAgent() {
 		}
 
 		sm.SAClient = &StateAgentClient{
-			Conn: conn,
+			Conn:   conn,
 			Client: client,
 		}
 
@@ -91,7 +92,7 @@ func (sm *StateAgent) ReportState() {
 
 	defer sm.SAClient.Conn.Close()
 
-	go func(){
+	go func() {
 		_, err := client.Recv()
 		if err != nil {
 			if status, ok := status.FromError(err); ok {
@@ -121,7 +122,7 @@ func (sm *StateAgent) ReportState() {
 		case <-closeChan:
 			kg.Printf("Closing connection with State Agent")
 			return
-		case event := <- sm.StateEvents:
+		case event := <-sm.StateEvents:
 			if s, ok := status.FromError(client.Send(event)); ok {
 				switch s.Code() {
 				case codes.OK:

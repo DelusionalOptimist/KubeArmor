@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LogServiceClient interface {
+	// keeping this for legacy healthchecks
 	HealthCheck(ctx context.Context, in *NonceMessage, opts ...grpc.CallOption) (*ReplyMessage, error)
 	WatchMessages(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (LogService_WatchMessagesClient, error)
 	WatchAlerts(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (LogService_WatchAlertsClient, error)
@@ -145,6 +146,7 @@ func (x *logServiceWatchLogsClient) Recv() (*Log, error) {
 // All implementations should embed UnimplementedLogServiceServer
 // for forward compatibility
 type LogServiceServer interface {
+	// keeping this for legacy healthchecks
 	HealthCheck(context.Context, *NonceMessage) (*ReplyMessage, error)
 	WatchMessages(*RequestMessage, LogService_WatchMessagesServer) error
 	WatchAlerts(*RequestMessage, LogService_WatchAlertsServer) error
@@ -292,57 +294,47 @@ var LogService_ServiceDesc = grpc.ServiceDesc{
 	Metadata: "kubearmor.proto",
 }
 
-// PushLogServiceClient is the client API for PushLogService service.
+// ReverseLogServiceClient is the client API for ReverseLogService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PushLogServiceClient interface {
-	HealthCheck(ctx context.Context, in *NonceMessage, opts ...grpc.CallOption) (*ReplyMessage, error)
-	PushMessages(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushMessagesClient, error)
-	PushAlerts(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushAlertsClient, error)
-	PushLogs(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushLogsClient, error)
+type ReverseLogServiceClient interface {
+	PushMessages(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushMessagesClient, error)
+	PushAlerts(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushAlertsClient, error)
+	PushLogs(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushLogsClient, error)
 }
 
-type pushLogServiceClient struct {
+type reverseLogServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPushLogServiceClient(cc grpc.ClientConnInterface) PushLogServiceClient {
-	return &pushLogServiceClient{cc}
+func NewReverseLogServiceClient(cc grpc.ClientConnInterface) ReverseLogServiceClient {
+	return &reverseLogServiceClient{cc}
 }
 
-func (c *pushLogServiceClient) HealthCheck(ctx context.Context, in *NonceMessage, opts ...grpc.CallOption) (*ReplyMessage, error) {
-	out := new(ReplyMessage)
-	err := c.cc.Invoke(ctx, "/feeder.PushLogService/HealthCheck", in, out, opts...)
+func (c *reverseLogServiceClient) PushMessages(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushMessagesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ReverseLogService_ServiceDesc.Streams[0], "/feeder.ReverseLogService/PushMessages", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-func (c *pushLogServiceClient) PushMessages(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushMessagesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PushLogService_ServiceDesc.Streams[0], "/feeder.PushLogService/PushMessages", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &pushLogServicePushMessagesClient{stream}
+	x := &reverseLogServicePushMessagesClient{stream}
 	return x, nil
 }
 
-type PushLogService_PushMessagesClient interface {
+type ReverseLogService_PushMessagesClient interface {
 	Send(*Message) error
 	Recv() (*ReplyMessage, error)
 	grpc.ClientStream
 }
 
-type pushLogServicePushMessagesClient struct {
+type reverseLogServicePushMessagesClient struct {
 	grpc.ClientStream
 }
 
-func (x *pushLogServicePushMessagesClient) Send(m *Message) error {
+func (x *reverseLogServicePushMessagesClient) Send(m *Message) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushMessagesClient) Recv() (*ReplyMessage, error) {
+func (x *reverseLogServicePushMessagesClient) Recv() (*ReplyMessage, error) {
 	m := new(ReplyMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -350,30 +342,30 @@ func (x *pushLogServicePushMessagesClient) Recv() (*ReplyMessage, error) {
 	return m, nil
 }
 
-func (c *pushLogServiceClient) PushAlerts(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushAlertsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PushLogService_ServiceDesc.Streams[1], "/feeder.PushLogService/PushAlerts", opts...)
+func (c *reverseLogServiceClient) PushAlerts(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushAlertsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ReverseLogService_ServiceDesc.Streams[1], "/feeder.ReverseLogService/PushAlerts", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pushLogServicePushAlertsClient{stream}
+	x := &reverseLogServicePushAlertsClient{stream}
 	return x, nil
 }
 
-type PushLogService_PushAlertsClient interface {
+type ReverseLogService_PushAlertsClient interface {
 	Send(*Alert) error
 	Recv() (*ReplyMessage, error)
 	grpc.ClientStream
 }
 
-type pushLogServicePushAlertsClient struct {
+type reverseLogServicePushAlertsClient struct {
 	grpc.ClientStream
 }
 
-func (x *pushLogServicePushAlertsClient) Send(m *Alert) error {
+func (x *reverseLogServicePushAlertsClient) Send(m *Alert) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushAlertsClient) Recv() (*ReplyMessage, error) {
+func (x *reverseLogServicePushAlertsClient) Recv() (*ReplyMessage, error) {
 	m := new(ReplyMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -381,30 +373,30 @@ func (x *pushLogServicePushAlertsClient) Recv() (*ReplyMessage, error) {
 	return m, nil
 }
 
-func (c *pushLogServiceClient) PushLogs(ctx context.Context, opts ...grpc.CallOption) (PushLogService_PushLogsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PushLogService_ServiceDesc.Streams[2], "/feeder.PushLogService/PushLogs", opts...)
+func (c *reverseLogServiceClient) PushLogs(ctx context.Context, opts ...grpc.CallOption) (ReverseLogService_PushLogsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ReverseLogService_ServiceDesc.Streams[2], "/feeder.ReverseLogService/PushLogs", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pushLogServicePushLogsClient{stream}
+	x := &reverseLogServicePushLogsClient{stream}
 	return x, nil
 }
 
-type PushLogService_PushLogsClient interface {
+type ReverseLogService_PushLogsClient interface {
 	Send(*Log) error
 	Recv() (*ReplyMessage, error)
 	grpc.ClientStream
 }
 
-type pushLogServicePushLogsClient struct {
+type reverseLogServicePushLogsClient struct {
 	grpc.ClientStream
 }
 
-func (x *pushLogServicePushLogsClient) Send(m *Log) error {
+func (x *reverseLogServicePushLogsClient) Send(m *Log) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushLogsClient) Recv() (*ReplyMessage, error) {
+func (x *reverseLogServicePushLogsClient) Recv() (*ReplyMessage, error) {
 	m := new(ReplyMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -412,81 +404,59 @@ func (x *pushLogServicePushLogsClient) Recv() (*ReplyMessage, error) {
 	return m, nil
 }
 
-// PushLogServiceServer is the server API for PushLogService service.
-// All implementations should embed UnimplementedPushLogServiceServer
+// ReverseLogServiceServer is the server API for ReverseLogService service.
+// All implementations should embed UnimplementedReverseLogServiceServer
 // for forward compatibility
-type PushLogServiceServer interface {
-	HealthCheck(context.Context, *NonceMessage) (*ReplyMessage, error)
-	PushMessages(PushLogService_PushMessagesServer) error
-	PushAlerts(PushLogService_PushAlertsServer) error
-	PushLogs(PushLogService_PushLogsServer) error
+type ReverseLogServiceServer interface {
+	PushMessages(ReverseLogService_PushMessagesServer) error
+	PushAlerts(ReverseLogService_PushAlertsServer) error
+	PushLogs(ReverseLogService_PushLogsServer) error
 }
 
-// UnimplementedPushLogServiceServer should be embedded to have forward compatible implementations.
-type UnimplementedPushLogServiceServer struct {
+// UnimplementedReverseLogServiceServer should be embedded to have forward compatible implementations.
+type UnimplementedReverseLogServiceServer struct {
 }
 
-func (UnimplementedPushLogServiceServer) HealthCheck(context.Context, *NonceMessage) (*ReplyMessage, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
-}
-func (UnimplementedPushLogServiceServer) PushMessages(PushLogService_PushMessagesServer) error {
+func (UnimplementedReverseLogServiceServer) PushMessages(ReverseLogService_PushMessagesServer) error {
 	return status.Errorf(codes.Unimplemented, "method PushMessages not implemented")
 }
-func (UnimplementedPushLogServiceServer) PushAlerts(PushLogService_PushAlertsServer) error {
+func (UnimplementedReverseLogServiceServer) PushAlerts(ReverseLogService_PushAlertsServer) error {
 	return status.Errorf(codes.Unimplemented, "method PushAlerts not implemented")
 }
-func (UnimplementedPushLogServiceServer) PushLogs(PushLogService_PushLogsServer) error {
+func (UnimplementedReverseLogServiceServer) PushLogs(ReverseLogService_PushLogsServer) error {
 	return status.Errorf(codes.Unimplemented, "method PushLogs not implemented")
 }
 
-// UnsafePushLogServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PushLogServiceServer will
+// UnsafeReverseLogServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ReverseLogServiceServer will
 // result in compilation errors.
-type UnsafePushLogServiceServer interface {
-	mustEmbedUnimplementedPushLogServiceServer()
+type UnsafeReverseLogServiceServer interface {
+	mustEmbedUnimplementedReverseLogServiceServer()
 }
 
-func RegisterPushLogServiceServer(s grpc.ServiceRegistrar, srv PushLogServiceServer) {
-	s.RegisterService(&PushLogService_ServiceDesc, srv)
+func RegisterReverseLogServiceServer(s grpc.ServiceRegistrar, srv ReverseLogServiceServer) {
+	s.RegisterService(&ReverseLogService_ServiceDesc, srv)
 }
 
-func _PushLogService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NonceMessage)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PushLogServiceServer).HealthCheck(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/feeder.PushLogService/HealthCheck",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PushLogServiceServer).HealthCheck(ctx, req.(*NonceMessage))
-	}
-	return interceptor(ctx, in, info, handler)
+func _ReverseLogService_PushMessages_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ReverseLogServiceServer).PushMessages(&reverseLogServicePushMessagesServer{stream})
 }
 
-func _PushLogService_PushMessages_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PushLogServiceServer).PushMessages(&pushLogServicePushMessagesServer{stream})
-}
-
-type PushLogService_PushMessagesServer interface {
+type ReverseLogService_PushMessagesServer interface {
 	Send(*ReplyMessage) error
 	Recv() (*Message, error)
 	grpc.ServerStream
 }
 
-type pushLogServicePushMessagesServer struct {
+type reverseLogServicePushMessagesServer struct {
 	grpc.ServerStream
 }
 
-func (x *pushLogServicePushMessagesServer) Send(m *ReplyMessage) error {
+func (x *reverseLogServicePushMessagesServer) Send(m *ReplyMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushMessagesServer) Recv() (*Message, error) {
+func (x *reverseLogServicePushMessagesServer) Recv() (*Message, error) {
 	m := new(Message)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -494,25 +464,25 @@ func (x *pushLogServicePushMessagesServer) Recv() (*Message, error) {
 	return m, nil
 }
 
-func _PushLogService_PushAlerts_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PushLogServiceServer).PushAlerts(&pushLogServicePushAlertsServer{stream})
+func _ReverseLogService_PushAlerts_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ReverseLogServiceServer).PushAlerts(&reverseLogServicePushAlertsServer{stream})
 }
 
-type PushLogService_PushAlertsServer interface {
+type ReverseLogService_PushAlertsServer interface {
 	Send(*ReplyMessage) error
 	Recv() (*Alert, error)
 	grpc.ServerStream
 }
 
-type pushLogServicePushAlertsServer struct {
+type reverseLogServicePushAlertsServer struct {
 	grpc.ServerStream
 }
 
-func (x *pushLogServicePushAlertsServer) Send(m *ReplyMessage) error {
+func (x *reverseLogServicePushAlertsServer) Send(m *ReplyMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushAlertsServer) Recv() (*Alert, error) {
+func (x *reverseLogServicePushAlertsServer) Recv() (*Alert, error) {
 	m := new(Alert)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -520,25 +490,25 @@ func (x *pushLogServicePushAlertsServer) Recv() (*Alert, error) {
 	return m, nil
 }
 
-func _PushLogService_PushLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PushLogServiceServer).PushLogs(&pushLogServicePushLogsServer{stream})
+func _ReverseLogService_PushLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ReverseLogServiceServer).PushLogs(&reverseLogServicePushLogsServer{stream})
 }
 
-type PushLogService_PushLogsServer interface {
+type ReverseLogService_PushLogsServer interface {
 	Send(*ReplyMessage) error
 	Recv() (*Log, error)
 	grpc.ServerStream
 }
 
-type pushLogServicePushLogsServer struct {
+type reverseLogServicePushLogsServer struct {
 	grpc.ServerStream
 }
 
-func (x *pushLogServicePushLogsServer) Send(m *ReplyMessage) error {
+func (x *reverseLogServicePushLogsServer) Send(m *ReplyMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pushLogServicePushLogsServer) Recv() (*Log, error) {
+func (x *reverseLogServicePushLogsServer) Recv() (*Log, error) {
 	m := new(Log)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -546,34 +516,29 @@ func (x *pushLogServicePushLogsServer) Recv() (*Log, error) {
 	return m, nil
 }
 
-// PushLogService_ServiceDesc is the grpc.ServiceDesc for PushLogService service.
+// ReverseLogService_ServiceDesc is the grpc.ServiceDesc for ReverseLogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var PushLogService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "feeder.PushLogService",
-	HandlerType: (*PushLogServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "HealthCheck",
-			Handler:    _PushLogService_HealthCheck_Handler,
-		},
-	},
+var ReverseLogService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "feeder.ReverseLogService",
+	HandlerType: (*ReverseLogServiceServer)(nil),
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "PushMessages",
-			Handler:       _PushLogService_PushMessages_Handler,
+			Handler:       _ReverseLogService_PushMessages_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
 			StreamName:    "PushAlerts",
-			Handler:       _PushLogService_PushAlerts_Handler,
+			Handler:       _ReverseLogService_PushAlerts_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
 			StreamName:    "PushLogs",
-			Handler:       _PushLogService_PushLogs_Handler,
+			Handler:       _ReverseLogService_PushLogs_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

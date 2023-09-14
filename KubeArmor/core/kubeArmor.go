@@ -92,6 +92,9 @@ type KubeArmorDaemon struct {
 	// state agent
 	StateAgent *state.StateAgent
 
+	// reverse policy server
+	ReversePolicyServer *policy.ReversePolicyServer
+
 	// WgDaemon Handler
 	WgDaemon sync.WaitGroup
 
@@ -179,6 +182,12 @@ func (dm *KubeArmorDaemon) DestroyKubeArmorDaemon() {
 		}
 	}
 
+	if dm.ReversePolicyServer != nil {
+		if dm.CloseReversePolicyServer() {
+			kg.Print("Destroyed ReversePolicyServer")
+		}
+	}
+
 	// wait for other routines
 	kg.Print("Waiting for routine terminations")
 	dm.WgDaemon.Wait()
@@ -210,6 +219,10 @@ func (dm *KubeArmorDaemon) ServeLogFeeds() {
 	defer dm.WgDaemon.Done()
 
 	go dm.Logger.ServeLogFeeds()
+
+	if cfg.GlobalCfg.ReverseGRPCServer {
+		go dm.Logger.ServeReverseLogFeeds()
+	}
 }
 
 // CloseLogger Function
@@ -307,6 +320,7 @@ func (dm *KubeArmorDaemon) CloseKVMAgent() bool {
 // ================= //
 // == State Agent == //
 // =============== //
+
 // InitStateAgent Function
 func (dm *KubeArmorDaemon) InitStateAgent() bool {
 	dm.StateAgent = state.NewStateAgent(cfg.GlobalCfg.StateAgentAddr)
@@ -327,6 +341,13 @@ func (dm *KubeArmorDaemon) CloseStateAgent() bool {
 	return true
 }
 */
+
+func (dm *KubeArmorDaemon) CloseReversePolicyServer() bool {
+	if err := dm.ReversePolicyServer.DestroyReversePolicyServer(); err != nil {
+		return false
+	}
+	return true
+}
 
 // ==================== //
 // == Signal Handler == //
@@ -679,11 +700,13 @@ func KubeArmor() {
 	}
 
 	if !dm.K8sEnabled && (enableContainerPolicy || cfg.GlobalCfg.HostPolicy) {
-		policyService := &policy.ServiceServer{}
+		policyService := &policy.PolicyServer{}
+
 		if enableContainerPolicy {
 			policyService.UpdateContainerPolicy = dm.ParseAndUpdateContainerSecurityPolicy
 			dm.Logger.Print("Started to monitor container security policies on gRPC")
 		}
+
 		if cfg.GlobalCfg.HostPolicy {
 			policyService.UpdateHostPolicy = dm.ParseAndUpdateHostSecurityPolicy
 			dm.Node.PolicyEnabled = tp.KubeArmorPolicyEnabled
@@ -691,6 +714,22 @@ func KubeArmor() {
 		}
 
 		pb.RegisterPolicyServiceServer(dm.Logger.LogServer, policyService)
+
+		if cfg.GlobalCfg.ReverseGRPCServer {
+			dm.ReversePolicyServer = policy.NewReversePolicyServer(dm.Logger.RelayServerURL)
+
+			if enableContainerPolicy {
+				dm.ReversePolicyServer.UpdateContainerPolicy = dm.ParseAndUpdateContainerSecurityPolicy
+				dm.Logger.Print("Started to monitor container security policies over reverse gRPC connection")
+			}
+
+			if cfg.GlobalCfg.HostPolicy {
+				dm.ReversePolicyServer.UpdateHostPolicy = dm.ParseAndUpdateHostSecurityPolicy
+				dm.Logger.Print("Started to monitor host security policies over reverse gRPC connection")
+			}
+
+			go dm.ReversePolicyServer.WatchPolicies()
+		}
 	}
 
 	reflection.Register(dm.Logger.LogServer) // Helps grpc clients list out what all svc/endpoints available
@@ -730,7 +769,9 @@ func KubeArmor() {
 		dm.Logger.Print("Started to keep the connection to KVM Service")
 	}
 
-	go dm.StateAgent.PushNodeEvent(dm.Node, "added")
+	if dm.StateAgent != nil {
+		go dm.StateAgent.PushNodeEvent(dm.Node, "added")
+	}
 
 	// == //
 

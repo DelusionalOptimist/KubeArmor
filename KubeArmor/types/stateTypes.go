@@ -6,7 +6,7 @@ type ContainerDetails struct {
 	Image         string `json:"image,omitempty"`
 	Status        string `json:"status,omitempty"`
 	ProtocolPort  string `json:"protocol_port,omitempty"`
-	ContainerId   string `json:"container_id,omitempty"`
+	ContainerId   string `json:"containerId,omitempty"`
 }
 
 type PodDetails struct {
@@ -21,8 +21,8 @@ type PodDetails struct {
 	Operation       string              `json:"operation,omitempty"`
 	PodIp           string              `json:"pod_ip,omitempty"`
 	WorkspaceId     int64               `json:"workspace_id,omitempty"`
-	WorkloadName    string              `json:"workload_name,omitempty"`
-	WorkloadType    string              `json:"workload_type,omitempty"`
+	WorkloadName    string              `json:"workloadName,omitempty"`
+	WorkloadType    string              `json:"workloadType,omitempty"`
 }
 
 type NodeDetails struct {

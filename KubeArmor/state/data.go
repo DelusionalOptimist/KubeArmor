@@ -35,8 +35,8 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	}
 
 	stateEvent := &pb.StateEvent{
-		Kind: "pod",
-		Type: event,
+		Kind:   "pod",
+		Type:   event,
 		Object: containerData,
 	}
 
@@ -45,32 +45,32 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	if event == "added" {
 		StateEventCache[cacheKey] = stateEvent
 		/*
-		// create this kubearmor ns if it doesn't exist
-		if _, ok := KubeArmorNamespaces[namespace]; !ok {
-			KubeArmorNamespaces[namespace] = []string{}
-			KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
-			go sa.PushNamespaceEvent(namespace, "added")
-		}
+			// create this kubearmor ns if it doesn't exist
+			if _, ok := KubeArmorNamespaces[namespace]; !ok {
+				KubeArmorNamespaces[namespace] = []string{}
+				KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+				go sa.PushNamespaceEvent(namespace, "added")
+			}
 		*/
 	} else if event == "deleted" {
 		delete(StateEventCache, cacheKey)
 		/*
-		// delete this container from kubearmor ns
-		if containers, ok := KubeArmorNamespaces[namespace]; ok {
-			containerDeleted := false
-			for i, c := range containers {
-				if c == container.ContainerID {
-					newNSList := kl.RemoveStringElement(containers, i)
-					KubeArmorNamespaces[namespace] = newNSList
-					break
+			// delete this container from kubearmor ns
+			if containers, ok := KubeArmorNamespaces[namespace]; ok {
+				containerDeleted := false
+				for i, c := range containers {
+					if c == container.ContainerID {
+						newNSList := kl.RemoveStringElement(containers, i)
+						KubeArmorNamespaces[namespace] = newNSList
+						break
+					}
+				}
+
+				// no containers left - namespace deleted
+				if containerDeleted && len(KubeArmorNamespaces[namespace]) > 0 {
+					go sa.PushNamespaceEvent(namespace, "deleted")
 				}
 			}
-
-			// no containers left - namespace deleted
-			if containerDeleted && len(KubeArmorNamespaces[namespace]) > 0 {
-				go sa.PushNamespaceEvent(namespace, "deleted")
-			}
-		}
 		*/
 	}
 
@@ -88,15 +88,15 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 	if podE == "" {
 
 		// ContainerDetails
-		containerD := &tp.ContainerDetails {
+		containerD := &tp.ContainerDetails{
 			ContainerName: container.ContainerName,
-			Image: container.ContainerImage,
-			ContainerId: container.ContainerID,
-			Status: container.Status,
-			ProtocolPort: container.ProtocolPort,
+			Image:         container.ContainerImage,
+			ContainerId:   container.ContainerID,
+			Status:        container.Status,
+			ProtocolPort:  container.ProtocolPort,
 			NameOfService: container.ContainerName,
 		}
-		containerDetails := []*tp.ContainerDetails { containerD }
+		containerDetails := []*tp.ContainerDetails{containerD}
 
 		/* TODO - why SIA uses only single port
 		var protcolPort []string
@@ -131,27 +131,27 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 			if !ok {
 				continue
 			}
-			l := &tp.Labels {
-				Key: key,
+			l := &tp.Labels{
+				Key:   key,
 				Value: value,
 			}
 
 			labels = append(labels, l)
 		}
 
-		podDetails := tp.PodDetails {
+		podDetails := tp.PodDetails{
 			// ClusterID
 			NewPodName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
 			//OldPodName: "",
-			Namespace: container.NamespaceName,
-			NodeName: cfg.GlobalCfg.Host,
+			Namespace:       container.NamespaceName,
+			NodeName:        cfg.GlobalCfg.Host,
 			LastUpdatedTime: time.Now().UTC().String(),
-			Container: containerDetails,
-			Labels: labels,
-			Operation: event,
-			PodIp: container.ContainerIP,
-			WorkloadName: containerD.ContainerName,
-			WorkloadType: "ReplicaSet",
+			Container:       containerDetails,
+			Labels:          labels,
+			Operation:       event,
+			PodIp:           container.ContainerIP,
+			WorkloadName:    containerD.ContainerName,
+			WorkloadType:    "ReplicaSet",
 		}
 
 		podBytes, err := json.Marshal(podDetails)
@@ -173,18 +173,18 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 
 	var labels []*tp.Labels
 	for key, val := range node.Annotations {
-		l := &tp.Labels {
-			Key: key,
+		l := &tp.Labels{
+			Key:   key,
 			Value: val,
 		}
 		labels = append(labels, l)
 	}
 
-	nodeDetails := tp.NodeDetails {
-		NewNodeName: node.NodeName,
+	nodeDetails := tp.NodeDetails{
+		NewNodeName:     node.NodeName,
 		LastUpdatedTime: time.Now().UTC().String(),
-		Labels: labels,
-		Operation: event,
+		Labels:          labels,
+		Operation:       event,
 	}
 
 	nodeData, err := json.Marshal(nodeDetails)
@@ -194,8 +194,8 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 	}
 
 	stateEvent := &pb.StateEvent{
-		Kind: "node",
-		Type: event,
+		Kind:   "node",
+		Type:   event,
 		Object: nodeData,
 	}
 
