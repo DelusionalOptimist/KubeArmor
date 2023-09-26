@@ -209,6 +209,12 @@ func (ch *ContainerdHandler) GetContainerInfo(ctx context.Context, containerID s
 			labels = append(labels, k+"="+v)
 		}
 		container.Labels = strings.Join(labels, ",")
+
+		container.Owner = tp.PodOwner{
+			Name: container.ContainerName,
+			Namespace: container.NamespaceName,
+			Ref: "Deployment",
+		}
 	}
 
 	// == //

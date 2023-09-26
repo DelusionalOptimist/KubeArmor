@@ -166,6 +166,13 @@ func (dh *DockerHandler) GetContainerInfo(containerID string) (tp.Container, err
 			podIP = inspect.NetworkSettings.Networks[networkName].IPAddress
 		}
 		container.ContainerIP = podIP
+
+		// where will this go if kubearmor is not a state agent
+		container.Owner = tp.PodOwner{
+			Name: container.ContainerName,
+			Namespace: container.NamespaceName,
+			Ref: "Deployment",
+		}
 	}
 
 	return container, nil
@@ -212,7 +219,7 @@ func (dm *KubeArmorDaemon) SetContainerVisibility(containerID string) {
 	}
 
 	container.EndPointName = container.ContainerName
-	//container.NamespaceName = "container_namespace"
+	container.NamespaceName = "container_namespace"
 
 	dm.Containers[container.ContainerID] = container
 }

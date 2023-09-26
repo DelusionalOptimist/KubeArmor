@@ -14,11 +14,6 @@ import (
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 )
 
-var (
-	StateEventCache = make(map[string]*pb.StateEvent)
-	KubeArmorNamespaces = make(map[string][]string)
-)
-
 // pushes (container + pod) & workload event
 func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	if container.ContainerID == "" {
@@ -40,46 +35,48 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	stateEvent := &pb.StateEvent{
 		Kind:   "pod",
 		Type:   event,
+		Name:   container.ContainerName,
 		Object: containerData,
 	}
 
 	workloadStateEvent := &pb.StateEvent{
 		Kind:   "workload",
 		Type:   event,
+		Name:   container.ContainerName,
 		Object: workloadData,
 	}
 
 	namespace := container.NamespaceName
 	cacheKey := fmt.Sprintf("kubearmor-container-%.12s", container.ContainerID)
 	if event == "added" {
-		StateEventCache[cacheKey] = stateEvent
-		StateEventCache[cacheKey] = workloadStateEvent
+		sa.StateEventCache[cacheKey] = stateEvent
+		sa.StateEventCache[cacheKey] = workloadStateEvent
 
 		// create this kubearmor ns if it doesn't exist
-		if _, ok := KubeArmorNamespaces[namespace]; !ok {
-			KubeArmorNamespaces[namespace] = []string{}
-			KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+		if _, ok := sa.KubeArmorNamespaces[namespace]; !ok {
+			sa.KubeArmorNamespaces[namespace] = []string{}
+			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
 			go sa.PushNamespaceEvent(namespace, "added")
 		} else {
-			KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
 		}
 
 	} else if event == "deleted" {
-		delete(StateEventCache, cacheKey)
+		delete(sa.StateEventCache, cacheKey)
 
 		// delete this container from kubearmor ns
-		if containers, ok := KubeArmorNamespaces[namespace]; ok {
+		if containers, ok := sa.KubeArmorNamespaces[namespace]; ok {
 			containerDeleted := false
 			for i, c := range containers {
 				if c == container.ContainerID {
 					newNSList := common.RemoveStringElement(containers, i)
-					KubeArmorNamespaces[namespace] = newNSList
+					sa.KubeArmorNamespaces[namespace] = newNSList
 					break
 				}
 			}
 
 			// no containers left - namespace deleted
-			if containerDeleted && len(KubeArmorNamespaces[namespace]) > 0 {
+			if containerDeleted && len(sa.KubeArmorNamespaces[namespace]) > 0 {
 				go sa.PushNamespaceEvent(namespace, "deleted")
 			}
 		}
@@ -159,7 +156,8 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 
 		podDetails := tp.PodDetails{
 			// ClusterID
-			NewPodName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+			//NewPodName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+			NewPodName:      container.ContainerName,
 			//OldPodName: "",
 			Namespace:       container.NamespaceName,
 			NodeName:        cfg.GlobalCfg.Host,
@@ -168,8 +166,8 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 			Labels:          labels,
 			Operation:       event,
 			PodIp:           container.ContainerIP,
-			WorkloadName:    containerD.ContainerName,
-			WorkloadType:    "ReplicaSet",
+			WorkloadName:    fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+			WorkloadType:    "Deployment",
 		}
 
 		podBytes, err := json.Marshal(podDetails)
@@ -177,8 +175,9 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 			return nil, nil, err
 		}
 
-		workload := types.Workload {
-			NewName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+		workload := tp.Workload {
+			//NewName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+			NewName: container.ContainerName,
 			Namespace: container.NamespaceName,
 			LastUpdatedTime: time.Now().UTC().String(),
 			Labels: labels,
@@ -228,14 +227,15 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 	stateEvent := &pb.StateEvent{
 		Kind:   "node",
 		Type:   event,
+		Name:   node.NodeName,
 		Object: nodeData,
 	}
 
 	cacheKey := fmt.Sprintf("kubearmor-node-%s", node.NodeName)
 	if event == "added" {
-		StateEventCache[cacheKey] = stateEvent
+		sa.StateEventCache[cacheKey] = stateEvent
 	} else if event == "deleted" {
-		delete(StateEventCache, cacheKey)
+		delete(sa.StateEventCache, cacheKey)
 	}
 
 	select {
@@ -264,6 +264,7 @@ func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
 	stateEvent := &pb.StateEvent{
 		Kind:   "namespace",
 		Type:   event,
+		Name:   namespace,
 		Object: nsBytes,
 	}
 

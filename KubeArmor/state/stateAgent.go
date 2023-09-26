@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/kubearmor/KubeArmor/KubeArmor/common"
@@ -11,9 +12,8 @@ import (
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
-	"google.golang.org/grpc/status"
 )
 
 type StateAgent struct {
@@ -25,11 +25,21 @@ type StateAgent struct {
 	PodEntity string
 
 	SAClient *StateAgentClient
+
+	StateEventCache     map[string]*pb.StateEvent
+	StateEventCacheLock *sync.RWMutex
+
+	KubeArmorNamespaces map[string][]string
+
+	Wg *sync.WaitGroup
+	Context context.Context
+	Cancel context.CancelFunc
 }
 
 type StateAgentClient struct {
 	Conn   *grpc.ClientConn
-	Client pb.StateAgent_StateAgentClient
+	WatchClient pb.StateAgent_WatchStateClient
+	GetClient pb.StateAgent_GetStateClient
 }
 
 func NewStateAgent(addr string) *StateAgent {
@@ -52,118 +62,252 @@ func NewStateAgent(addr string) *StateAgent {
 		podEntity = ""
 	}
 
-	sm := &StateAgent{
+	context, cancel := context.WithCancel(context.Background())
+
+	sa := &StateAgent{
 		StateAgentAddr: fmt.Sprintf("%s:%s", host, port),
-		StateEvents:    make(chan *pb.StateEvent),
-		Running:        true,
-		PodEntity:      podEntity,
+		StateEvents:    make(chan *pb.StateEvent, 1),
+
+		Running:   true,
+		PodEntity: podEntity,
+
+		StateEventCache:     make(map[string]*pb.StateEvent),
+		StateEventCacheLock: new(sync.RWMutex),
+
+		KubeArmorNamespaces: make(map[string][]string),
+
+		Wg: new(sync.WaitGroup),
+		Context: context,
+		Cancel: cancel,
 	}
 
-	return sm
+	return sa
 }
 
-func (sm *StateAgent) RunStateAgent() {
-	kg.Print("Trying to connect with State Agent Server")
+func (sa *StateAgent) RunStateAgent() {
+	var err error
 
-	for sm.Running {
+	for sa.Running {
 		// connect with state agent service
-		conn, client, err := connectWithStateAgentService(sm.StateAgentAddr)
+		sa.SAClient, err = sa.connectWithStateAgentService()
 		if err != nil {
-			kg.Debugf("Failed to connect with StateAgent at %s: %s", sm.StateAgentAddr, err.Error())
-			// TODO: backoff algorithm
-			time.Sleep(5 * time.Second)
+			kg.Debugf("Failed to connect with StateAgent at %s: %s", sa.StateAgentAddr, err.Error())
 			continue
 		}
 
-		sm.SAClient = &StateAgentClient{
-			Conn:   conn,
-			Client: client,
+		kg.Printf("Connected with State Agent Service for reporting state")
+
+		sa.Wg.Add(1)
+		go sa.WatchStateClient()
+
+		sa.Wg.Add(1)
+		go sa.GetStateClient()
+
+		sa.Wg.Wait()
+
+		if err := sa.SAClient.Conn.Close(); err != nil {
+			kg.Warnf("Failed to close State Agent client: %s", err.Error())
 		}
+		kg.Printf("Closed State Agent client")
 
-		kg.Printf("Connected with State Agent for reporting state")
-
-		sm.ReportState()
+		sa.SAClient = nil
 	}
+
+	kg.Printf("Stop streaming state events")
 }
 
-func (sm *StateAgent) ReportState() {
-	client := sm.SAClient.Client
+// DestroyStateAgent
+func (sa *StateAgent) DestroyStateAgent() error {
+	sa.Cancel()
+	sa.Running = false
+	time.Sleep(1 * time.Second)
+
+	if sa.SAClient != nil {
+		if sa.SAClient.Conn != nil {
+			err := sa.SAClient.Conn.Close()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// wait for terminations
+	sa.Wg.Wait()
+
+	return nil
+}
+
+// sends state events in a continuous stream
+func (sa *StateAgent) WatchStateClient() {
+	defer sa.Wg.Done()
+
+	kg.Print("Streaming State Events with WatchState Client")
+	defer kg.Print("Closed WatchState Client")
+
+	client := sa.SAClient.WatchClient
 	closeChan := make(chan struct{})
 
-	defer sm.SAClient.Conn.Close()
+	defer kg.Printf("Closed")
 
 	go func() {
+		defer close(closeChan)
 		_, err := client.Recv()
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				switch status.Code() {
-				case codes.OK:
-				default:
-					kg.Warnf("Error while receiving reply from State Agent. %s", err)
-				}
-			}
+		if err := kl.HandleGRPCErrors(err); err != nil {
+			kg.Warnf("Error while receiving reply from State Agent WatchClient. %s", err.Error())
 		}
 		closeChan <- struct{}{}
 	}()
 
 	// send cached "added" events
-	for _, event := range StateEventCache {
-		if s, ok := status.FromError(client.Send(event)); ok {
-			switch s.Code() {
-			case codes.OK:
-			default:
-				kg.Warnf("Failed to send cached state event.", s.Err().Error())
+	go func() {
+		for _, event := range sa.StateEventCache {
+			err := client.Send(event)
+			if grpcErr := kl.HandleGRPCErrors(err); grpcErr != nil {
+				kg.Warnf("Failed to send cached state event.")
+				return
 			}
-		}
-	}
 
-	for {
+			// below approach is DRY but has chances of losing state events
+			/*
+			select {
+			case sa.StateEvents <- event:
+			default:
+				kg.Warnf("Failed to send cached state event.")
+			}
+			*/
+		}
+	}()
+
+	for sa.Running {
 		select {
-		case <-closeChan:
-			kg.Printf("Closing connection with State Agent")
+		case <-client.Context().Done():
 			return
-		case event := <-sm.StateEvents:
-			if s, ok := status.FromError(client.Send(event)); ok {
-				switch s.Code() {
-				case codes.OK:
-					continue
-				default:
-					kg.Warnf("Failed to send state event.", s.Err().Error())
-					// TODO: backoff then retry
-					return
-				}
+		case <-closeChan:
+			kg.Printf("Closing connection with State Agent Client")
+			return
+		case event := <-sa.StateEvents:
+			if err := kl.HandleGRPCErrors(client.Send(event)); err != nil {
+				kg.Warnf("Failed to send state event.", err.Error())
+				return
 			}
 		}
 	}
 }
 
-func connectWithStateAgentService(addr string) (*grpc.ClientConn, pb.StateAgent_StateAgentClient, error) {
+// sends state event stream upon request
+func (sa *StateAgent) GetStateClient() {
+	defer sa.Wg.Done()
+
+	kg.Print("Streaming State Events with GetState Client")
+	defer kg.Print("Closed GetState Client")
+
+	client := sa.SAClient.GetClient
+
+	for sa.Running {
+		select {
+		// to avoid panics when the connection has been terminated
+		case <-client.Context().Done():
+			return
+		default:
+			_, err := client.Recv()
+			if err := kl.HandleGRPCErrors(err); err != nil {
+				kg.Warnf("Error while receiving request from GetState Client %s", err.Error())
+				continue
+			}
+
+			stateEventList := make([]*pb.StateEvent, 1)
+			for _, event := range sa.StateEventCache {
+				stateEventList = append(stateEventList, event)
+			}
+
+			stateEvents := &pb.StateEvents{
+				StateEvents: stateEventList,
+			}
+
+			err = client.Send(stateEvents)
+			if err := kl.HandleGRPCErrors(err); err != nil {
+				kg.Warnf("Failed to send State Events to GetState Client: ", err.Error())
+				return
+			}
+		}
+	}
+}
+
+func (sa *StateAgent) connectWithStateAgentService() (*StateAgentClient, error) {
+	var (
+		err error
+		conn *grpc.ClientConn
+		client pb.StateAgentClient
+	)
+
 	kacp := keepalive.ClientParameters{
 		Time:                1 * time.Second,
 		Timeout:             5 * time.Second,
 		PermitWithoutStream: true,
 	}
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
+	for sa.Running {
+		conn, err = grpc.DialContext(sa.Context, sa.StateAgentAddr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
+		if err != nil {
+			time.Sleep(time.Second * 5)
+			conn.Close()
+			continue
+		}
+
+		client = pb.NewStateAgentClient(conn)
+		if client == nil {
+			time.Sleep(time.Second * 5)
+			conn.Close()
+			continue
+		}
+
+		healthClient := grpc_health_v1.NewHealthClient(conn)
+		healthCheckRequest := &grpc_health_v1.HealthCheckRequest{
+			Service: pb.StateAgent_ServiceDesc.ServiceName,
+		}
+
+		resp, err := healthClient.Check(sa.Context, healthCheckRequest)
+		grpcErr := kl.HandleGRPCErrors(err)
+		if grpcErr != nil {
+			kg.Debugf("State Agent Service unhealthy. Error: %s", grpcErr.Error())
+			conn.Close()
+			time.Sleep(time.Second * 5)
+			continue
+		}
+
+		switch resp.Status {
+		case grpc_health_v1.HealthCheckResponse_SERVING:
+			break
+		case grpc_health_v1.HealthCheckResponse_NOT_SERVING:
+			conn.Close()
+			return nil, fmt.Errorf("State Agent server is not serving")
+		default:
+			kg.Debugf("State Agent Service unhealthy. Status: %s", resp.Status.String())
+			conn.Close()
+			time.Sleep(time.Second * 5)
+			continue
+		}
+
+		break
+	}
+
+	watchClient, err := client.WatchState(sa.Context)
 	if err != nil {
-		conn.Close()
-		return nil, nil, err
+		err := fmt.Errorf("Failed to create StateAgent WatchClient: %s", err.Error())
+		return nil, err
 	}
 
-	client := pb.NewStateAgentClient(conn)
-	if client == nil {
-		err = fmt.Errorf("Failed to create StateAgent client")
-		return nil, nil, err
-	}
-
-	saClient, err := client.StateAgent(context.Background())
+	getClient, err := client.GetState(sa.Context)
 	if err != nil {
-		err := fmt.Errorf("Failed to create StateAgent StateReportClient: %s", err.Error())
-		return nil, nil, err
+		err := fmt.Errorf("Failed to create StateAgent GetClient: %s", err.Error())
+		return nil, err
 	}
 
-	// TODO: healthchecks
-	// hc := pb.NewHealthClient(conn)
+	saClient := &StateAgentClient{
+		Conn:   conn,
+		WatchClient: watchClient,
+		GetClient: getClient,
+	}
 
-	return conn, saClient, nil
+	return saClient, nil
 }

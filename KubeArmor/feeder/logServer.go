@@ -9,19 +9,6 @@ import (
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 )
 
-/*
-type BaseLogServer struct {
-	MsgStructs map[string]EventStruct[pb.Message]
-	MsgLock    *sync.RWMutex
-
-	AlertStructs map[string]EventStruct[pb.Alert]
-	AlertLock    *sync.RWMutex
-
-	LogStructs map[string]EventStruct[pb.Log]
-	LogLock    *sync.RWMutex
-}
-*/
-
 // LogServer Structure
 type LogService struct {
 	QueueSize    int

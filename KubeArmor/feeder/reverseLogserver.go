@@ -224,18 +224,6 @@ func (fd *BaseFeeder) ConnectWithRelay() *ReverseLogService {
 	}
 
 	lc := &ReverseLogService{
-		/*
-		BaseLogServer: BaseLogServer {
-			MsgStructs: fd.MsgStructs,
-			MsgLock: &fd.MsgLock,
-
-			AlertStructs: fd.AlertStructs,
-			AlertLock: &fd.AlertLock,
-
-			LogStructs: fd.LogStructs,
-			LogLock: &fd.LogLock,
-		},
-		*/
 		Conn:         conn,
 		Client:       client,
 		Wg:           sync.WaitGroup{},

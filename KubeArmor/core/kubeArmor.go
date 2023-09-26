@@ -188,6 +188,13 @@ func (dm *KubeArmorDaemon) DestroyKubeArmorDaemon() {
 		}
 	}
 
+	if dm.StateAgent != nil {
+		go dm.StateAgent.PushNodeEvent(dm.Node, "deleted")
+		if dm.CloseStateAgent() {
+			kg.Print("Destroyed StateAgent")
+		}
+	}
+
 	// wait for other routines
 	kg.Print("Waiting for routine terminations")
 	dm.WgDaemon.Wait()
@@ -331,7 +338,6 @@ func (dm *KubeArmorDaemon) RunStateAgent() {
 	go dm.StateAgent.RunStateAgent()
 }
 
-/*
 // CloseStateAgent Function
 func (dm *KubeArmorDaemon) CloseStateAgent() bool {
 	if err := dm.StateAgent.DestroyStateAgent(); err != nil {
@@ -340,7 +346,6 @@ func (dm *KubeArmorDaemon) CloseStateAgent() bool {
 	}
 	return true
 }
-*/
 
 func (dm *KubeArmorDaemon) CloseReversePolicyServer() bool {
 	if err := dm.ReversePolicyServer.DestroyReversePolicyServer(); err != nil {
@@ -493,6 +498,10 @@ func KubeArmor() {
 
 		// connect to state agent server
 		go dm.RunStateAgent()
+	}
+
+	if dm.StateAgent != nil {
+		go dm.StateAgent.PushNodeEvent(dm.Node, "added")
 	}
 
 	// Containerized workloads with Host
@@ -767,10 +776,6 @@ func KubeArmor() {
 		// connect to KVM Service
 		go dm.ConnectToKVMService()
 		dm.Logger.Print("Started to keep the connection to KVM Service")
-	}
-
-	if dm.StateAgent != nil {
-		go dm.StateAgent.PushNodeEvent(dm.Node, "added")
 	}
 
 	// == //
