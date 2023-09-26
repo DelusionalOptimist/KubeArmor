@@ -6,24 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
+	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 )
 
 var (
 	StateEventCache = make(map[string]*pb.StateEvent)
-	//KubeArmorNamespaces = make(map[string][]string)
+	KubeArmorNamespaces = make(map[string][]string)
 )
 
+// pushes (container + pod) & workload event
 func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	if container.ContainerID == "" {
 		kg.Debugf("Error while pushing container event. Incomplete data.")
 		return
 	}
 
-	containerData, err := processContainerEvent(sa.PodEntity, container, event)
+	containerData, workloadData, err := processContainerEvent(sa.PodEntity, container, event)
 	if err != nil {
 		kg.Debugf("Error while processing container data. %s", err.Error())
 		return
@@ -40,38 +43,47 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 		Object: containerData,
 	}
 
-	//namespace := container.NamespaceName
+	workloadStateEvent := &pb.StateEvent{
+		Kind:   "workload",
+		Type:   event,
+		Object: workloadData,
+	}
+
+	namespace := container.NamespaceName
 	cacheKey := fmt.Sprintf("kubearmor-container-%.12s", container.ContainerID)
 	if event == "added" {
 		StateEventCache[cacheKey] = stateEvent
-		/*
-			// create this kubearmor ns if it doesn't exist
-			if _, ok := KubeArmorNamespaces[namespace]; !ok {
-				KubeArmorNamespaces[namespace] = []string{}
-				KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
-				go sa.PushNamespaceEvent(namespace, "added")
-			}
-		*/
+		StateEventCache[cacheKey] = workloadStateEvent
+
+		// create this kubearmor ns if it doesn't exist
+		if _, ok := KubeArmorNamespaces[namespace]; !ok {
+			KubeArmorNamespaces[namespace] = []string{}
+			KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+			go sa.PushNamespaceEvent(namespace, "added")
+		} else {
+			KubeArmorNamespaces[namespace] = append(KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+		}
+
 	} else if event == "deleted" {
 		delete(StateEventCache, cacheKey)
-		/*
-			// delete this container from kubearmor ns
-			if containers, ok := KubeArmorNamespaces[namespace]; ok {
-				containerDeleted := false
-				for i, c := range containers {
-					if c == container.ContainerID {
-						newNSList := kl.RemoveStringElement(containers, i)
-						KubeArmorNamespaces[namespace] = newNSList
-						break
-					}
-				}
 
-				// no containers left - namespace deleted
-				if containerDeleted && len(KubeArmorNamespaces[namespace]) > 0 {
-					go sa.PushNamespaceEvent(namespace, "deleted")
+		// delete this container from kubearmor ns
+		if containers, ok := KubeArmorNamespaces[namespace]; ok {
+			containerDeleted := false
+			for i, c := range containers {
+				if c == container.ContainerID {
+					newNSList := common.RemoveStringElement(containers, i)
+					KubeArmorNamespaces[namespace] = newNSList
+					break
 				}
 			}
-		*/
+
+			// no containers left - namespace deleted
+			if containerDeleted && len(KubeArmorNamespaces[namespace]) > 0 {
+				go sa.PushNamespaceEvent(namespace, "deleted")
+			}
+		}
+
 	}
 
 	select {
@@ -80,11 +92,17 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 		kg.Warnf("Failed to send container state event")
 	}
 
+	select {
+	case sa.StateEvents <- workloadStateEvent:
+	default:
+		kg.Warnf("Failed to send workload state event")
+	}
+
 	return
 }
 
-func processContainerEvent(podE string, container tp.Container, event string) ([]byte, error) {
-	// pod entity doesn't exist
+func processContainerEvent(podE string, container tp.Container, event string) ([]byte, []byte, error) {
+	// pod entity doesn't exist for this platform
 	if podE == "" {
 
 		// ContainerDetails
@@ -156,13 +174,27 @@ func processContainerEvent(podE string, container tp.Container, event string) ([
 
 		podBytes, err := json.Marshal(podDetails)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return podBytes, nil
+		workload := types.Workload {
+			NewName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+			Namespace: container.NamespaceName,
+			LastUpdatedTime: time.Now().UTC().String(),
+			Labels: labels,
+			Type: "Deployment",
+			Operation: event,
+		}
+
+		workloadBytes, err := json.Marshal(workload)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return podBytes, workloadBytes, nil
 	}
 
-	return []byte(""), nil
+	return nil, nil, nil
 }
 
 func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
@@ -215,6 +247,33 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 	return
 }
 
+func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
+	nsDetails := types.NamespaceDetails{
+		NewNamespaceName: namespace,
+		LastUpdatedTime: time.Now().UTC().String(),
+		Operation:       event,
+		//KubearmorFilePosture: "audit",
+		//KubearmorNetworkPosture: "audit",
+	}
+
+	nsBytes, err := json.Marshal(nsDetails)
+	if err != nil {
+		kg.Warnf("Failed to marshal ns event: %s", err.Error())
+	}
+
+	stateEvent := &pb.StateEvent{
+		Kind:   "namespace",
+		Type:   event,
+		Object: nsBytes,
+	}
+
+	select {
+	case sa.StateEvents <- stateEvent:
+	default:
+		kg.Warnf("Failed to send ns state event")
+	}
+}
+
 /*
 // All native ways to get node data
 func GetNodeData() types.Node {
@@ -262,6 +321,7 @@ func GetNodeData() types.Node {
 		OperatingSystem: nodeOS,
 	}
 }
+*/
 
 /*
 // Extreme amount of pod data

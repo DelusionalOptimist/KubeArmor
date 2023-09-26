@@ -47,6 +47,18 @@ type NamespaceDetails struct {
 	KubearmorNetworkPosture string    `json:"kubearmor_network_posture,omitempty"`
 }
 
+type Workload struct {
+	ClusterId       int64     `json:"cluster_id,omitempty"`
+	WorkspaceId     int64     `json:"workspace_id,omitempty"`
+	NewName         string    `json:"new_name,omitempty"`
+	OldName         string    `json:"old_name,omitempty"`
+	Namespace       string    `json:"namespace,omitempty"`
+	LastUpdatedTime string    `json:"last_updated_time,omitempty"`
+	Labels          []*Labels `json:"labels,omitempty"`
+	Type            string    `json:"type,omitempty"`
+	Operation       string    `json:"operation,omitempty"`
+}
+
 type Labels struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`

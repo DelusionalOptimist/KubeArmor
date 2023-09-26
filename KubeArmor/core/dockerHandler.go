@@ -212,7 +212,7 @@ func (dm *KubeArmorDaemon) SetContainerVisibility(containerID string) {
 	}
 
 	container.EndPointName = container.ContainerName
-	container.NamespaceName = "container_namespace"
+	//container.NamespaceName = "container_namespace"
 
 	dm.Containers[container.ContainerID] = container
 }
