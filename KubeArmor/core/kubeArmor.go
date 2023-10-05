@@ -189,7 +189,7 @@ func (dm *KubeArmorDaemon) DestroyKubeArmorDaemon() {
 	}
 
 	if dm.StateAgent != nil {
-		go dm.StateAgent.PushNodeEvent(dm.Node, "deleted")
+		go dm.StateAgent.PushNodeEvent(dm.Node, state.EventDeleted)
 		if dm.CloseStateAgent() {
 			kg.Print("Destroyed StateAgent")
 		}
@@ -330,7 +330,7 @@ func (dm *KubeArmorDaemon) CloseKVMAgent() bool {
 
 // InitStateAgent Function
 func (dm *KubeArmorDaemon) InitStateAgent() bool {
-	dm.StateAgent = state.NewStateAgent(cfg.GlobalCfg.StateAgentAddr)
+	dm.StateAgent = state.NewStateAgent(cfg.GlobalCfg.StateAgentAddr, &dm.Node, dm.NodeLock, dm.Containers, dm.ContainersLock)
 	return dm.StateAgent != nil
 }
 
@@ -389,6 +389,7 @@ func KubeArmor() {
 		dm.Node.NodeIP = kl.GetExternalIPAddr()
 
 		dm.Node.Annotations = map[string]string{}
+		dm.Node.Labels = map[string]string{}
 		dm.HandleNodeAnnotations(&dm.Node)
 
 		hostInfo := kl.GetCommandOutputWithoutErr("hostnamectl", []string{})
@@ -485,6 +486,10 @@ func KubeArmor() {
 
 	// Init StateAgent
 	if !dm.K8sEnabled && cfg.GlobalCfg.StateAgent {
+		dm.NodeLock.Lock()
+		dm.Node.ClusterName = cfg.GlobalCfg.Cluster
+		dm.NodeLock.Unlock()
+
 		// initialize state agent
 		if !dm.InitStateAgent() {
 			dm.Logger.Err("Failed to initialize State Agent Client")
@@ -501,7 +506,7 @@ func KubeArmor() {
 	}
 
 	if dm.StateAgent != nil {
-		go dm.StateAgent.PushNodeEvent(dm.Node, "added")
+		go dm.StateAgent.PushNodeEvent(dm.Node, state.EventAdded)
 	}
 
 	// Containerized workloads with Host

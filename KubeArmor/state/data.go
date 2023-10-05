@@ -2,12 +2,8 @@ package state
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
-	"time"
 
 	"github.com/kubearmor/KubeArmor/KubeArmor/common"
-	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
@@ -17,10 +13,48 @@ import (
 // pushes (container + pod) & workload event
 func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 	if container.ContainerID == "" {
-		kg.Debugf("Error while pushing container event. Incomplete data.")
+		kg.Debug("Error while pushing container event. Missing data.")
 		return
 	}
 
+	// create ns first
+	namespace := container.NamespaceName
+	sa.KubeArmorNamespacesLock.Lock()
+	if event == EventAdded {
+
+		// create this kubearmor ns if it doesn't exist
+		// currently a synthetic object until we have config agent
+		if _, ok := sa.KubeArmorNamespaces[namespace]; !ok {
+			sa.KubeArmorNamespaces[namespace] = []string{}
+			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+
+			sa.PushNamespaceEvent(namespace, EventAdded)
+		} else {
+			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
+		}
+
+	} else if event == EventDeleted {
+
+		if containers, ok := sa.KubeArmorNamespaces[namespace]; ok {
+			containerDeleted := false
+			for i, c := range containers {
+				if c == container.ContainerID {
+					newNSList := common.RemoveStringElement(containers, i)
+					sa.KubeArmorNamespaces[namespace] = newNSList
+					break
+				}
+			}
+
+			// no containers left - namespace deleted
+			if containerDeleted && len(sa.KubeArmorNamespaces[namespace]) > 0 {
+				sa.PushNamespaceEvent(namespace, EventDeleted)
+			}
+		}
+
+	}
+	sa.KubeArmorNamespacesLock.Unlock()
+
+	/*
 	containerData, workloadData, err := processContainerEvent(sa.PodEntity, container, event)
 	if err != nil {
 		kg.Debugf("Error while processing container data. %s", err.Error())
@@ -48,21 +82,24 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 
 	namespace := container.NamespaceName
 	cacheKey := fmt.Sprintf("kubearmor-container-%.12s", container.ContainerID)
-	if event == "added" {
+	workloadCacheKey := fmt.Sprintf("kubearmor-workload-%.12s", container.ContainerID)
+	if event == EventAdded {
 		sa.StateEventCache[cacheKey] = stateEvent
-		sa.StateEventCache[cacheKey] = workloadStateEvent
+		sa.StateEventCache[workloadCacheKey] = workloadStateEvent
 
 		// create this kubearmor ns if it doesn't exist
 		if _, ok := sa.KubeArmorNamespaces[namespace]; !ok {
 			sa.KubeArmorNamespaces[namespace] = []string{}
 			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
-			go sa.PushNamespaceEvent(namespace, "added")
+
+			go sa.PushNamespaceEvent(namespace, EventAdded)
 		} else {
 			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
 		}
 
-	} else if event == "deleted" {
+	} else if event == EventDeleted {
 		delete(sa.StateEventCache, cacheKey)
+		delete(sa.StateEventCache, workloadCacheKey)
 
 		// delete this container from kubearmor ns
 		if containers, ok := sa.KubeArmorNamespaces[namespace]; ok {
@@ -77,133 +114,172 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 
 			// no containers left - namespace deleted
 			if containerDeleted && len(sa.KubeArmorNamespaces[namespace]) > 0 {
-				go sa.PushNamespaceEvent(namespace, "deleted")
+				go sa.PushNamespaceEvent(namespace, EventDeleted)
+				delete(sa.StateEventCache, namespace)
 			}
 		}
 
 	}
 
-	select {
-	case sa.StateEvents <- stateEvent:
-	default:
-		kg.Warnf("Failed to send container state event")
-	}
-
+	// workloads are created first (just like k8s)
 	select {
 	case sa.StateEvents <- workloadStateEvent:
 	default:
 		kg.Warnf("Failed to send workload state event")
 	}
+	*/
+
+	containerBytes, err := json.Marshal(container)
+	if err != nil {
+		kg.Warnf("Error while trying to marshal container data. %s", err.Error())
+		return
+	}
+
+	containerEvent := &pb.StateEvent{
+		Kind:   KindContainer,
+		Type:   event,
+		Name:   container.ContainerName,
+		Object: containerBytes,
+	}
+
+	select {
+	case sa.StateEvents <- containerEvent:
+	default:
+		kg.Debugf("Failed to send container %s state event", event)
+		return
+	}
 
 	return
 }
 
-func processContainerEvent(podE string, container tp.Container, event string) ([]byte, []byte, error) {
-	// pod entity doesn't exist for this platform
-	if podE == "" {
-
-		// ContainerDetails
-		containerD := &tp.ContainerDetails{
-			ContainerName: container.ContainerName,
-			Image:         container.ContainerImage,
-			ContainerId:   container.ContainerID,
-			Status:        container.Status,
-			ProtocolPort:  container.ProtocolPort,
-			NameOfService: container.ContainerName,
-		}
-		containerDetails := []*tp.ContainerDetails{containerD}
-
-		/* TODO - why SIA uses only single port
-		var protcolPort []string
-		for n, port := range container.NetworkSettings.Ports {
-			if len(port) > 0 {
-				portInfo := strings.Split(string(n), "/")
-				if len(portInfo) != 2 {
-					continue
-				}
-				var k8sPort v1.ContainerPort
-				for _, p := range port {
-					intHPort, _ := strconv.ParseInt(p.HostPort, 10, 32)
-					intCPort, _ := strconv.ParseInt(portInfo[0], 10, 32)
-					k8sPort = v1.ContainerPort {
-						Name: fmt.Sprintf("%s:%d", p.HostIP, portInfo[0]),
-						HostPort: int32(intHPort),
-						ContainerPort: int32(intCPort),
-						Protocol: v1.Protocol(strings.ToUpper(portInfo[1])),
-						HostIP: p.HostIP,
-					}
-				}
-
-				ports = append(ports, k8sPort)
-			}
-		}
-		*/
-
-		var labels []*tp.Labels
-		labelsSlice := strings.Split(container.Labels, ",")
-		for _, label := range labelsSlice {
-			key, value, ok := strings.Cut(label, "=")
-			if !ok {
-				continue
-			}
-			l := &tp.Labels{
-				Key:   key,
-				Value: value,
-			}
-
-			labels = append(labels, l)
-		}
-
-		podDetails := tp.PodDetails{
-			// ClusterID
-			//NewPodName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
-			NewPodName:      container.ContainerName,
-			//OldPodName: "",
-			Namespace:       container.NamespaceName,
-			NodeName:        cfg.GlobalCfg.Host,
-			LastUpdatedTime: time.Now().UTC().String(),
-			Container:       containerDetails,
-			Labels:          labels,
-			Operation:       event,
-			PodIp:           container.ContainerIP,
-			WorkloadName:    fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
-			WorkloadType:    "Deployment",
-		}
-
-		podBytes, err := json.Marshal(podDetails)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		workload := tp.Workload {
-			//NewName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
-			NewName: container.ContainerName,
-			Namespace: container.NamespaceName,
-			LastUpdatedTime: time.Now().UTC().String(),
-			Labels: labels,
-			Type: "Deployment",
-			Operation: event,
-		}
-
-		workloadBytes, err := json.Marshal(workload)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return podBytes, workloadBytes, nil
-	}
-
-	return nil, nil, nil
-}
+//func processContainerEvent(podE string, container tp.Container, event string) ([]byte, []byte, error) {
+//	// pod entity doesn't exist for this platform
+//	if podE == "" {
+//
+//		// ContainerDetails
+//		containerD := &tp.ContainerDetails{
+//			ContainerName: container.ContainerName,
+//			Image:         container.ContainerImage,
+//			ContainerId:   container.ContainerID,
+//			Status:        container.Status,
+//			ProtocolPort:  container.ProtocolPort,
+//			NameOfService: container.ContainerName,
+//		}
+//		containerDetails := []*tp.ContainerDetails{containerD}
+//
+//		/* TODO - why SIA uses only single port
+//		var protcolPort []string
+//		for n, port := range container.NetworkSettings.Ports {
+//			if len(port) > 0 {
+//				portInfo := strings.Split(string(n), "/")
+//				if len(portInfo) != 2 {
+//					continue
+//				}
+//				var k8sPort v1.ContainerPort
+//				for _, p := range port {
+//					intHPort, _ := strconv.ParseInt(p.HostPort, 10, 32)
+//					intCPort, _ := strconv.ParseInt(portInfo[0], 10, 32)
+//					k8sPort = v1.ContainerPort {
+//						Name: fmt.Sprintf("%s:%d", p.HostIP, portInfo[0]),
+//						HostPort: int32(intHPort),
+//						ContainerPort: int32(intCPort),
+//						Protocol: v1.Protocol(strings.ToUpper(portInfo[1])),
+//						HostIP: p.HostIP,
+//					}
+//				}
+//
+//				ports = append(ports, k8sPort)
+//			}
+//		}
+//		*/
+//
+//		var labels []*tp.Labels
+//		labelsSlice := strings.Split(container.Labels, ",")
+//		for _, label := range labelsSlice {
+//			key, value, ok := strings.Cut(label, "=")
+//			if !ok {
+//				continue
+//			}
+//			l := &tp.Labels{
+//				Key:   key,
+//				Value: value,
+//			}
+//
+//			labels = append(labels, l)
+//		}
+//
+//		podDetails := tp.PodDetails{
+//			// ClusterID
+//			//NewPodName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+//			NewPodName:      container.ContainerName,
+//			//OldPodName: "",
+//			Namespace:       container.NamespaceName,
+//			NodeName:        cfg.GlobalCfg.Host,
+//			LastUpdatedTime: time.Now().UTC().String(),
+//			Container:       containerDetails,
+//			Labels:          labels,
+//			Operation:       event,
+//			PodIp:           container.ContainerIP,
+//			//WorkloadName:    fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+//			WorkloadName:    container.ContainerName,
+//			WorkloadType:    "Deployment",
+//		}
+//
+//		podBytes, err := json.Marshal(podDetails)
+//		if err != nil {
+//			return nil, nil, err
+//		}
+//
+//		workload := tp.Workload {
+//			//NewName: fmt.Sprintf("%s-%.6s", container.ContainerName, container.ContainerID),
+//			NewName: container.ContainerName,
+//			Namespace: container.NamespaceName,
+//			LastUpdatedTime: time.Now().UTC().String(),
+//			Labels: labels,
+//			Type: "Deployment",
+//			Operation: event,
+//		}
+//
+//		workloadBytes, err := json.Marshal(workload)
+//		if err != nil {
+//			return nil, nil, err
+//		}
+//
+//		return podBytes, workloadBytes, nil
+//	}
+//
+//	return nil, nil, nil
+//}
 
 func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 	if node.NodeName == "" {
-		kg.Warnf("Received empty node event")
+		kg.Warn("Received empty node event")
 		return
 	}
 
+	nodeData, err := json.Marshal(node)
+	if err != nil {
+		kg.Warnf("Error while trying to marshal node data. %s", err.Error())
+		return
+	}
+
+	nodeEvent := &pb.StateEvent{
+		Kind:   KindNode,
+		Type:   event,
+		Name:   node.NodeName,
+		Object: nodeData,
+	}
+
+	select {
+	case sa.StateEvents <- nodeEvent:
+	default:
+		kg.Debugf("Failed to send node %s state event.", event)
+		return
+	}
+
+	/*
 	var labels []*tp.Labels
-	for key, val := range node.Annotations {
+	for key, val := range node.Labels {
 		l := &tp.Labels{
 			Key:   key,
 			Value: val,
@@ -224,30 +300,26 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 		return
 	}
 
-	stateEvent := &pb.StateEvent{
-		Kind:   "node",
-		Type:   event,
-		Name:   node.NodeName,
-		Object: nodeData,
-	}
-
 	cacheKey := fmt.Sprintf("kubearmor-node-%s", node.NodeName)
-	if event == "added" {
+	if event == EventAdded {
 		sa.StateEventCache[cacheKey] = stateEvent
-	} else if event == "deleted" {
+	} else if event == EventDeleted {
 		delete(sa.StateEventCache, cacheKey)
 	}
-
-	select {
-	case sa.StateEvents <- stateEvent:
-	default:
-		kg.Debugf("Failed to send node event.")
-	}
+	*/
 
 	return
 }
 
 func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
+	ns := types.Namespace{
+		Name: namespace,
+		//Labels: "",
+		KubearmorFilePosture: "audit",
+		KubearmorNetworkPosture: "audit",
+	}
+
+	/*
 	nsDetails := types.NamespaceDetails{
 		NewNamespaceName: namespace,
 		LastUpdatedTime: time.Now().UTC().String(),
@@ -255,23 +327,33 @@ func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
 		//KubearmorFilePosture: "audit",
 		//KubearmorNetworkPosture: "audit",
 	}
+	*/
 
-	nsBytes, err := json.Marshal(nsDetails)
+	nsBytes, err := json.Marshal(ns)
 	if err != nil {
 		kg.Warnf("Failed to marshal ns event: %s", err.Error())
+		return
 	}
 
-	stateEvent := &pb.StateEvent{
-		Kind:   "namespace",
+	nsEvent := &pb.StateEvent{
+		Kind:   KindNamespace,
 		Type:   event,
 		Name:   namespace,
 		Object: nsBytes,
 	}
 
+	/*
+	// deletion handled in PushContainerEvent
+	if event == EventAdded {
+		sa.StateEventCache[namespace] = nsEvent
+	}
+	*/
+
 	select {
-	case sa.StateEvents <- stateEvent:
+	case sa.StateEvents <- nsEvent:
 	default:
-		kg.Warnf("Failed to send ns state event")
+		kg.Debugf("Failed to send namespace %s state event", event)
+		return
 	}
 }
 

@@ -1,5 +1,6 @@
 package types
 
+/*
 type ContainerDetails struct {
 	ContainerName string `json:"container_name,omitempty"`
 	NameOfService string `json:"name_of_service,omitempty"`
@@ -63,3 +64,4 @@ type Labels struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
 }
+*/

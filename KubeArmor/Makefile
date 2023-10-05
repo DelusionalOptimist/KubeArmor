@@ -59,7 +59,7 @@ run-container: build
 	cd $(CURDIR)/BPF; make
 	#cd $(CURDIR); sudo -E ./kubearmor -logPath=/tmp/kubearmor.log -enableKubeArmorHostPolicy -enableKubeArmorPolicy -k8s=false -gRPC=32768 -relayServerURL=localhost:32767
 	#cd $(CURDIR); sudo -E ./kubearmor -logPath=/tmp/kubearmor.log -enableKubeArmorPolicy -enableKubeArmorHostPolicy -k8s=false -enableReverseGRPC -relayServerURL=localhost:32768
-	cd $(CURDIR); sudo -E DEBUG=true ./kubearmor -logPath=/tmp/kubearmor.log -enableKubeArmorPolicy -enableKubeArmorHostPolicy -k8s=false -enableReverseGRPC -relayServerURL=localhost:32768 -enableStateAgent=true -stateAgentAddr=localhost:32769
+	cd $(CURDIR); sudo -E DEBUG=true ./kubearmor -logPath=/tmp/kubearmor.log -enableKubeArmorPolicy -enableKubeArmorHostPolicy -k8s=false -criSocket=unix:///var/run/docker.sock -enableReverseGRPC -relayServerURL=localhost:32768 -enableStateAgent=true -stateAgentAddr=localhost:32769 -hostVisibility=none
 
 .PHONY: run-host-only
 run-host-only: build

@@ -547,7 +547,8 @@ func (fd *Feeder) PushMessage(level, message string) {
 	pbMsg.Timestamp = timestamp
 	pbMsg.UpdatedTime = updatedTime
 
-	pbMsg.ClusterName = cfg.GlobalCfg.Cluster
+	//pbMsg.ClusterName = cfg.GlobalCfg.Cluster
+	pbMsg.ClusterName = fd.Node.ClusterName
 
 	pbMsg.HostName = cfg.GlobalCfg.Host
 	pbMsg.HostIP = fd.Node.NodeIP

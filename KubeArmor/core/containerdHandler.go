@@ -15,6 +15,7 @@ import (
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
+	"github.com/kubearmor/KubeArmor/KubeArmor/state"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
 
 	pb "github.com/containerd/containerd/api/services/containers/v1"
@@ -201,6 +202,8 @@ func (ch *ContainerdHandler) GetContainerInfo(ctx context.Context, containerID s
 		// TODO
 		container.ProtocolPort = "0"
 
+		container.NodeName = cfg.GlobalCfg.Host
+
 		labels := []string{}
 		for k, v := range res.Container.Labels {
 			labels = append(labels, k+"="+v)
@@ -357,7 +360,7 @@ func (dm *KubeArmorDaemon) UpdateContainerdContainer(ctx context.Context, contai
 
 		if cfg.GlobalCfg.StateAgent {
 			container.Status = "running"
-			go dm.StateAgent.PushContainerEvent(container, "added")
+			go dm.StateAgent.PushContainerEvent(container, state.EventAdded)
 		}
 
 		dm.Logger.Printf("Detected a container (added/%.12s/pidns=%d/mntns=%d)", containerID, container.PidNS, container.MntNS)
@@ -402,7 +405,7 @@ func (dm *KubeArmorDaemon) UpdateContainerdContainer(ctx context.Context, contai
 
 		if cfg.GlobalCfg.StateAgent {
 			container.Status = "terminated"
-			go dm.StateAgent.PushContainerEvent(container, "deleted")
+			go dm.StateAgent.PushContainerEvent(container, state.EventDeleted)
 		}
 
 		dm.Logger.Printf("Detected a container (removed/%.12s/pidns=%d/mntns=%d)", containerID, container.PidNS, container.MntNS)

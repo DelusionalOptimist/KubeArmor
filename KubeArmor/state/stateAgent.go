@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -10,10 +11,22 @@ import (
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
+	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+)
+
+const (
+	EventAdded   = "added"
+	EventUpdated = "updated"
+	EventDeleted = "deleted"
+
+	KindContainer = "container"
+	KindPod       = "pod"
+	KindNode      = "node"
+	KindNamespace = "namespace"
 )
 
 type StateAgent struct {
@@ -26,10 +39,19 @@ type StateAgent struct {
 
 	SAClient *StateAgentClient
 
+	/*
 	StateEventCache     map[string]*pb.StateEvent
 	StateEventCacheLock *sync.RWMutex
+	*/
 
-	KubeArmorNamespaces map[string][]string
+	Node     *tp.Node
+	NodeLock *sync.RWMutex
+
+	Containers     map[string]tp.Container
+	ContainersLock *sync.RWMutex
+
+	KubeArmorNamespaces     map[string][]string
+	KubeArmorNamespacesLock *sync.RWMutex
 
 	Wg *sync.WaitGroup
 	Context context.Context
@@ -38,11 +60,12 @@ type StateAgent struct {
 
 type StateAgentClient struct {
 	Conn   *grpc.ClientConn
+
 	WatchClient pb.StateAgent_WatchStateClient
-	GetClient pb.StateAgent_GetStateClient
+	GetClient   pb.StateAgent_GetStateClient
 }
 
-func NewStateAgent(addr string) *StateAgent {
+func NewStateAgent(addr string, node *tp.Node, nodeLock *sync.RWMutex, containers map[string]tp.Container, containersLock *sync.RWMutex) *StateAgent {
 	host, port, err := common.ParseURL(addr)
 	if err != nil {
 		kg.Err("Error while parsing State Agent URL")
@@ -66,15 +89,24 @@ func NewStateAgent(addr string) *StateAgent {
 
 	sa := &StateAgent{
 		StateAgentAddr: fmt.Sprintf("%s:%s", host, port),
-		StateEvents:    make(chan *pb.StateEvent, 1),
+		StateEvents:    make(chan *pb.StateEvent, 25),
 
 		Running:   true,
 		PodEntity: podEntity,
 
+		/*
 		StateEventCache:     make(map[string]*pb.StateEvent),
 		StateEventCacheLock: new(sync.RWMutex),
+		*/
 
-		KubeArmorNamespaces: make(map[string][]string),
+		Node: node,
+		NodeLock: nodeLock,
+
+		Containers: containers,
+		ContainersLock: containersLock,
+
+		KubeArmorNamespaces:     make(map[string][]string),
+		KubeArmorNamespacesLock: new(sync.RWMutex),
 
 		Wg: new(sync.WaitGroup),
 		Context: context,
@@ -158,7 +190,8 @@ func (sa *StateAgent) WatchStateClient() {
 		closeChan <- struct{}{}
 	}()
 
-	// send cached "added" events
+	/*
+	// send cached EventAdded events
 	go func() {
 		for _, event := range sa.StateEventCache {
 			err := client.Send(event)
@@ -168,17 +201,20 @@ func (sa *StateAgent) WatchStateClient() {
 			}
 
 			// below approach is DRY but has chances of losing state events
-			/*
-			select {
-			case sa.StateEvents <- event:
-			default:
-				kg.Warnf("Failed to send cached state event.")
-			}
-			*/
+			//select {
+			//case sa.StateEvents <- event:
+			//default:
+			//	kg.Warnf("Failed to send cached state event.")
+			//}
 		}
 	}()
+	*/
 
+	//var once sync.Once
 	for sa.Running {
+		// send existing state only once
+		// go once.Do(sa.SendExistingState)
+
 		select {
 		case <-client.Context().Done():
 			return
@@ -194,7 +230,31 @@ func (sa *StateAgent) WatchStateClient() {
 	}
 }
 
-// sends state event stream upon request
+/*
+func (sa *StateAgent) SendExistingState() {
+	fmt.Println("send existing state called")
+	//sa.NodeLock.RLock()
+	sa.PushNodeEvent(*sa.Node, EventAdded)
+	//sa.NodeLock.RUnlock()
+
+	//sa.ContainersLock.RLock()
+	for _, container := range sa.Containers {
+		sa.PushContainerEvent(container, EventAdded)
+	}
+	//sa.ContainersLock.RUnlock()
+
+	//sa.KubeArmorNamespacesLock.RLock()
+	//defer sa.KubeArmorNamespacesLock.RUnlock()
+
+	//sa.KubeArmorNamespacesLock.Lock()
+	for ns := range sa.KubeArmorNamespaces {
+		sa.PushNamespaceEvent(ns, EventAdded)
+	}
+	//sa.KubeArmorNamespacesLock.RUnlock()
+}
+*/
+
+// sends state events over a stream upon request
 func (sa *StateAgent) GetStateClient() {
 	defer sa.Wg.Done()
 
@@ -216,9 +276,63 @@ func (sa *StateAgent) GetStateClient() {
 			}
 
 			stateEventList := make([]*pb.StateEvent, 1)
+
+			//sa.NodeLock.RLock()
+			nodeData, err := json.Marshal(sa.Node)
+			if err != nil {
+				kg.Warnf("Error while trying to marshal node data. %s", err.Error())
+			}
+
+			nodeEvent := &pb.StateEvent{
+				Kind:   KindNode,
+				Type:   EventAdded,
+				Name:   sa.Node.NodeName,
+				Object: nodeData,
+			}
+			stateEventList = append(stateEventList, nodeEvent)
+			//sa.NodeLock.RUnlock()
+
+			//sa.ContainersLock.RLock()
+			for _, container := range sa.Containers {
+				containerBytes, err := json.Marshal(container)
+				if err != nil {
+					kg.Warnf("Error while trying to marshal container data. %s", err.Error())
+				}
+
+				containerEvent := &pb.StateEvent{
+					Kind:   KindContainer,
+					Type:   EventAdded,
+					Name:   container.ContainerName,
+					Object: containerBytes,
+				}
+
+				stateEventList = append(stateEventList, containerEvent)
+			}
+			//sa.ContainersLock.RUnlock()
+
+			sa.KubeArmorNamespacesLock.RLock()
+			for ns := range sa.KubeArmorNamespaces {
+				nsBytes, err := json.Marshal(ns)
+				if err != nil {
+					kg.Warnf("Failed to marshal ns event: %s", err.Error())
+				}
+
+				nsEvent := &pb.StateEvent{
+					Kind:   KindNamespace,
+					Type:   EventAdded,
+					Name:   ns,
+					Object: nsBytes,
+				}
+
+				stateEventList = append(stateEventList, nsEvent)
+			}
+			sa.KubeArmorNamespacesLock.RUnlock()
+
+			/*
 			for _, event := range sa.StateEventCache {
 				stateEventList = append(stateEventList, event)
 			}
+			*/
 
 			stateEvents := &pb.StateEvents{
 				StateEvents: stateEventList,
@@ -229,6 +343,7 @@ func (sa *StateAgent) GetStateClient() {
 				kg.Warnf("Failed to send State Events to GetState Client: ", err.Error())
 				return
 			}
+
 		}
 	}
 }
@@ -304,7 +419,7 @@ func (sa *StateAgent) connectWithStateAgentService() (*StateAgentClient, error) 
 	}
 
 	saClient := &StateAgentClient{
-		Conn:   conn,
+		Conn: conn,
 		WatchClient: watchClient,
 		GetClient: getClient,
 	}

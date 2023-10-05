@@ -18,6 +18,7 @@ import (
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
+	"github.com/kubearmor/KubeArmor/KubeArmor/state"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
 )
 
@@ -144,14 +145,20 @@ func (dh *DockerHandler) GetContainerInfo(containerID string) (tp.Container, err
 
 	if cfg.GlobalCfg.StateAgent && !cfg.GlobalCfg.K8sEnv {
 		container.ContainerImage = inspect.Config.Image //+ kl.GetSHA256ofImage(inspect.Image)
-
 		// TODO
 		container.ProtocolPort = "0"
+
+		container.NodeName = cfg.GlobalCfg.Host
 
 		labels := []string{}
 		for k, v := range inspect.Config.Labels {
 			labels = append(labels, k+"="+v)
 		}
+
+		if _, ok := containerLabels["kubearmor.io/container.name"]; !ok {
+			labels = append(labels, "kubearmor.io/container.name="+container.ContainerName)
+		}
+
 		container.Labels = strings.Join(labels, ",")
 
 		var podIP string
@@ -173,6 +180,7 @@ func (dh *DockerHandler) GetContainerInfo(containerID string) (tp.Container, err
 			Namespace: container.NamespaceName,
 			Ref: "Deployment",
 		}
+
 	}
 
 	return container, nil
@@ -300,7 +308,7 @@ func (dm *KubeArmorDaemon) GetAlreadyDeployedDockerContainers() {
 				}
 
 				if cfg.GlobalCfg.StateAgent {
-					go dm.StateAgent.PushContainerEvent(container, "added")
+					go dm.StateAgent.PushContainerEvent(container, state.EventAdded)
 				}
 
 				if dm.SystemMonitor != nil && cfg.GlobalCfg.Policy {
@@ -327,7 +335,6 @@ func (dm *KubeArmorDaemon) UpdateDockerContainer(containerID, action string) {
 	container := tp.Container{}
 
 	if action == "start" {
-		fmt.Println("event received")
 		var err error
 
 		// get container information from docker client
@@ -406,7 +413,7 @@ func (dm *KubeArmorDaemon) UpdateDockerContainer(containerID, action string) {
 
 		if cfg.GlobalCfg.StateAgent {
 			container.Status = "running"
-			go dm.StateAgent.PushContainerEvent(container, "added")
+			go dm.StateAgent.PushContainerEvent(container, state.EventAdded)
 		}
 
 		dm.Logger.Printf("Detected a container (added/%.12s)", containerID)
@@ -452,7 +459,7 @@ func (dm *KubeArmorDaemon) UpdateDockerContainer(containerID, action string) {
 
 		if cfg.GlobalCfg.StateAgent {
 			container.Status = "terminated"
-			go dm.StateAgent.PushContainerEvent(container, "deleted")
+			go dm.StateAgent.PushContainerEvent(container, state.EventDeleted)
 		}
 
 		if dm.SystemMonitor != nil && cfg.GlobalCfg.Policy {
@@ -473,7 +480,7 @@ func (dm *KubeArmorDaemon) UpdateDockerContainer(containerID, action string) {
 		dm.ContainersLock.Unlock()
 
 		container.Status = "waiting"
-		go dm.StateAgent.PushContainerEvent(container, "updated")
+		go dm.StateAgent.PushContainerEvent(container, state.EventUpdated)
 	}
 }
 
