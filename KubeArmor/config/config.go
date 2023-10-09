@@ -45,6 +45,9 @@ type KubearmorConfig struct {
 
 	LsmOrder  []string // LSM order
 	BPFFsPath string   // path to the BPF filesystem
+
+	StateAgent     bool   // Enable/Disable State Agent Client
+	StateAgentAddr string // Address to State Agent Server
 }
 
 // PolicyDir policy dir path for host policies backup
@@ -119,6 +122,12 @@ const LsmOrder string = "lsm"
 // BPFFsPath key
 const BPFFsPath string = "bpfFsPath"
 
+// ConfigStateAgent state agent key
+const ConfigStateAgent string = "enableStateAgent"
+
+// ConfigStateAgentAddr state agent address key
+const ConfigStateAgentAddr string = "stateAgentAddr"
+
 func readCmdLineParams() {
 	hostname, _ := os.Hostname()
 	clusterStr := flag.String(ConfigCluster, "default", "cluster name")
@@ -150,6 +159,9 @@ func readCmdLineParams() {
 	lsmOrder := flag.String(LsmOrder, "bpf,apparmor,selinux", "lsm preference order to use, available lsms [bpf, apparmor, selinux]")
 
 	bpfFsPath := flag.String(BPFFsPath, "/sys/fs/bpf", "Path to the BPF filesystem to use for storing maps")
+
+	stateAgent := flag.Bool(ConfigStateAgent, false, "enabling KubeArmor State Agent client")
+	stateAgentAddr := flag.String(ConfigStateAgentAddr, "localhost:8801", "address of State Agent Server")
 
 	flags := []string{}
 	flag.VisitAll(func(f *flag.Flag) {
@@ -189,6 +201,9 @@ func readCmdLineParams() {
 	viper.SetDefault(LsmOrder, *lsmOrder)
 
 	viper.SetDefault(BPFFsPath, *bpfFsPath)
+
+	viper.SetDefault(ConfigStateAgent, *stateAgent)
+	viper.SetDefault(ConfigStateAgentAddr, *stateAgentAddr)
 }
 
 // LoadConfig Load configuration
@@ -266,6 +281,9 @@ func LoadConfig() error {
 	GlobalCfg.LsmOrder = strings.Split(viper.GetString(LsmOrder), ",")
 
 	GlobalCfg.BPFFsPath = viper.GetString(BPFFsPath)
+
+	GlobalCfg.StateAgent = viper.GetBool(ConfigStateAgent)
+	GlobalCfg.StateAgentAddr = viper.GetString(ConfigStateAgentAddr)
 
 	kg.Printf("Final Configuration [%+v]", GlobalCfg)
 
