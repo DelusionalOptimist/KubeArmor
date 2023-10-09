@@ -39,6 +39,13 @@ type Container struct {
 
 	// == //
 
+	NodeName     string `json:"node_name"`
+	ProtocolPort string `json:"protocolPort"`
+	Status       string `json:"status"`
+	ContainerIP  string `json:"container_ip"`
+
+	// == //
+
 	PolicyEnabled int `json:"policyEnabled"`
 
 	ProcessVisibilityEnabled      bool `json:"processVisibilityEnabled"`

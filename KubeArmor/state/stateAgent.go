@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2023 Authors of KubeArmor
+
+// package state implements the state agent service which reports details about the node and containers being protected by KubeArmor
 package state
 
 import (
@@ -42,11 +46,6 @@ type StateAgent struct {
 	PodEntity string
 
 	SAClient *StateAgentClient
-
-	/*
-	StateEventCache     map[string]*pb.StateEvent
-	StateEventCacheLock *sync.RWMutex
-	*/
 
 	Node     *tp.Node
 	NodeLock *sync.RWMutex
@@ -94,7 +93,6 @@ func NewStateAgent(addr string, node *tp.Node, nodeLock *sync.RWMutex, container
 
 	sa := &StateAgent{
 		StateAgentAddr: fmt.Sprintf("%s:%s", host, port),
-		//StateEvents:    make(chan *pb.StateEvent, 25),
 
 		Running:   true,
 		PodEntity: podEntity,
@@ -240,7 +238,7 @@ func (sa *StateAgent) GetStateClient() {
 				continue
 			}
 
-			stateEventList := make([]*pb.StateEvent, 1)
+			stateEventList := make([]*pb.StateEvent, 0)
 
 			nodeData, err := json.Marshal(sa.Node)
 			if err != nil {
