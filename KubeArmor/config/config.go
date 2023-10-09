@@ -47,6 +47,8 @@ type KubearmorConfig struct {
 	BPFFsPath         string   // path to the BPF filesystem
 	EnforcerAlerts    bool     // policy enforcer
 
+	StateAgent     bool   // Enable/Disable State Agent Client
+	StateAgentAddr string // Address to State Agent Server
 }
 
 // GlobalCfg Global configuration for Kubearmor
@@ -80,6 +82,12 @@ const (
 	BPFFsPath                            string = "bpfFsPath"
 	EnforcerAlerts                       string = "enforcerAlerts"
 )
+
+// ConfigStateAgent state agent key
+const ConfigStateAgent string = "enableStateAgent"
+
+// ConfigStateAgentAddr state agent address key
+const ConfigStateAgentAddr string = "stateAgentAddr"
 
 func readCmdLineParams() {
 	hostname, _ := os.Hostname()
@@ -115,6 +123,9 @@ func readCmdLineParams() {
 
 	bpfFsPath := flag.String(BPFFsPath, "/sys/fs/bpf", "Path to the BPF filesystem to use for storing maps")
 	enforcerAlerts := flag.Bool(EnforcerAlerts, true, "ebpf alerts")
+
+	stateAgent := flag.Bool(ConfigStateAgent, false, "enabling KubeArmor State Agent client")
+	stateAgentAddr := flag.String(ConfigStateAgentAddr, "localhost:8801", "address of State Agent Server")
 
 	flags := []string{}
 	flag.VisitAll(func(f *flag.Flag) {
@@ -158,6 +169,9 @@ func readCmdLineParams() {
 	viper.SetDefault(BPFFsPath, *bpfFsPath)
 
 	viper.SetDefault(EnforcerAlerts, *enforcerAlerts)
+
+	viper.SetDefault(ConfigStateAgent, *stateAgent)
+	viper.SetDefault(ConfigStateAgentAddr, *stateAgentAddr)
 }
 
 // LoadConfig Load configuration
@@ -237,6 +251,9 @@ func LoadConfig() error {
 
 	GlobalCfg.BPFFsPath = viper.GetString(BPFFsPath)
 	GlobalCfg.EnforcerAlerts = viper.GetBool(EnforcerAlerts)
+
+	GlobalCfg.StateAgent = viper.GetBool(ConfigStateAgent)
+	GlobalCfg.StateAgentAddr = viper.GetString(ConfigStateAgentAddr)
 
 	kg.Printf("Final Configuration [%+v]", GlobalCfg)
 
