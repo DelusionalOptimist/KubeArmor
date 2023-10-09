@@ -54,6 +54,14 @@ type PodOwner struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// Namespace struct
+type Namespace struct {
+	Name                    string `json:"name,omitempty"`
+	Labels                  string `json:"labels,omitempty"`
+	KubearmorFilePosture    string `json:"kubearmor_file_posture,omitempty"`
+	KubearmorNetworkPosture string `json:"kubearmor_network_posture,omitempty"`
+}
+
 // EndPoint Structure
 type EndPoint struct {
 	NamespaceName string `json:"namespaceName"`
