@@ -13,8 +13,8 @@ import (
 
 	"github.com/kubearmor/KubeArmor/KubeArmor/common"
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
-	cfg "github.com/kubearmor/KubeArmor/KubeArmor/config"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
+	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 	tp "github.com/kubearmor/KubeArmor/KubeArmor/types"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
 	"google.golang.org/grpc"
@@ -31,10 +31,6 @@ const (
 	KindPod       = "pod"
 	KindNode      = "node"
 	KindNamespace = "namespace"
-
-	PodEntityK8s = "pod"
-	PodEntityECS = "task"
-	PodEntityNone = "none"
 )
 
 type StateAgent struct {
@@ -43,7 +39,6 @@ type StateAgent struct {
 	StateAgentAddr string
 
 	Running   bool
-	PodEntity string
 
 	SAClient *StateAgentClient
 
@@ -75,27 +70,12 @@ func NewStateAgent(addr string, node *tp.Node, nodeLock *sync.RWMutex, container
 		return nil
 	}
 
-	var podEntity string
-	if ok := kl.IsK8sEnv(); ok && cfg.GlobalCfg.K8sEnv {
-		// pod == K8s pod
-		podEntity = PodEntityK8s
-	} else if ok := kl.IsECSEnv(); ok {
-		// pod == ECS task
-		// taskMetaURL, ok := os.LookupEnv("ECS_CONTAINER_METADATA_URI_V4")
-		podEntity = PodEntityECS
-	} else {
-		// pod == Container
-		// PodEntity == ""
-		podEntity = PodEntityNone
-	}
-
 	context, cancel := context.WithCancel(context.Background())
 
 	sa := &StateAgent{
 		StateAgentAddr: fmt.Sprintf("%s:%s", host, port),
 
 		Running:   true,
-		PodEntity: podEntity,
 
 		Node: node,
 		NodeLock: nodeLock,
@@ -270,8 +250,14 @@ func (sa *StateAgent) GetStateClient() {
 			}
 
 			sa.KubeArmorNamespacesLock.RLock()
-			for ns := range sa.KubeArmorNamespaces {
-				nsBytes, err := json.Marshal(ns)
+			for nsName := range sa.KubeArmorNamespaces {
+				nsObj := &types.Namespace{
+					Name: nsName,
+					KubearmorFilePosture: "audit",
+					KubearmorNetworkPosture: "audit",
+				}
+
+				nsBytes, err := json.Marshal(nsObj)
 				if err != nil {
 					kg.Warnf("Failed to marshal ns event: %s", err.Error())
 				}
@@ -279,7 +265,7 @@ func (sa *StateAgent) GetStateClient() {
 				nsEvent := &pb.StateEvent{
 					Kind:   KindNamespace,
 					Type:   EventAdded,
-					Name:   ns,
+					Name:   nsName,
 					Object: nsBytes,
 				}
 

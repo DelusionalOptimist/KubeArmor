@@ -28,7 +28,7 @@ func (sa *StateAgent) PushContainerEvent(container tp.Container, event string) {
 		// create this kubearmor ns if it doesn't exist
 		// currently only "container_namespace" until we have config agent
 		if _, ok := sa.KubeArmorNamespaces[namespace]; !ok {
-			sa.KubeArmorNamespaces[namespace] = []string{}
+			sa.KubeArmorNamespaces[namespace] = make([]string, 0)
 			sa.KubeArmorNamespaces[namespace] = append(sa.KubeArmorNamespaces[container.NamespaceName], container.ContainerID)
 
 			sa.PushNamespaceEvent(namespace, EventAdded)
@@ -119,9 +119,9 @@ func (sa *StateAgent) PushNodeEvent(node tp.Node, event string) {
 	return
 }
 
-func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
-	ns := types.Namespace{
-		Name: namespace,
+func (sa *StateAgent) PushNamespaceEvent(namespaceName string, event string) {
+	ns := &types.Namespace{
+		Name: namespaceName,
 		//Labels: "",
 		KubearmorFilePosture: "audit",
 		KubearmorNetworkPosture: "audit",
@@ -132,11 +132,12 @@ func (sa *StateAgent) PushNamespaceEvent(namespace string, event string) {
 		kg.Warnf("Failed to marshal ns event: %s", err.Error())
 		return
 	}
+	//fmt.Println("NAMESPACE-JSON:", string(nsBytes))
 
 	nsEvent := &pb.StateEvent{
 		Kind:   KindNamespace,
 		Type:   event,
-		Name:   namespace,
+		Name:   namespaceName,
 		Object: nsBytes,
 	}
 
