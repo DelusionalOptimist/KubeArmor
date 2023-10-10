@@ -48,7 +48,7 @@ type StateAgent struct {
 	Containers     map[string]tp.Container
 	ContainersLock *sync.RWMutex
 
-	KubeArmorNamespaces     map[string][]string
+	KubeArmorNamespaces     map[string]types.Namespace
 	KubeArmorNamespacesLock *sync.RWMutex
 
 	Wg *sync.WaitGroup
@@ -83,7 +83,7 @@ func NewStateAgent(addr string, node *tp.Node, nodeLock *sync.RWMutex, container
 		Containers: containers,
 		ContainersLock: containersLock,
 
-		KubeArmorNamespaces:     make(map[string][]string),
+		KubeArmorNamespaces: make(map[string]tp.Namespace),
 		KubeArmorNamespacesLock: new(sync.RWMutex),
 
 		Wg: new(sync.WaitGroup),
@@ -250,14 +250,8 @@ func (sa *StateAgent) GetStateClient() {
 			}
 
 			sa.KubeArmorNamespacesLock.RLock()
-			for nsName := range sa.KubeArmorNamespaces {
-				nsObj := &types.Namespace{
-					Name: nsName,
-					KubearmorFilePosture: "audit",
-					KubearmorNetworkPosture: "audit",
-				}
-
-				nsBytes, err := json.Marshal(nsObj)
+			for nsName, ns := range sa.KubeArmorNamespaces {
+				nsBytes, err := json.Marshal(ns)
 				if err != nil {
 					kg.Warnf("Failed to marshal ns event: %s", err.Error())
 				}

@@ -399,6 +399,8 @@ func KubeArmor() {
 			}
 		}
 
+		dm.Node.LastUpdatedAt = kl.GetBootTime()
+
 		dm.Node.KernelVersion = kl.GetCommandOutputWithoutErr("uname", []string{"-r"})
 		dm.Node.KernelVersion = strings.TrimSuffix(dm.Node.KernelVersion, "\n")
 
