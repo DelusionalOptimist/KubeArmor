@@ -2,7 +2,8 @@ name: ci-test-ginkgo
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
+    branches: [ci-tests]
     paths:
       - "KubeArmor/**"
       - "tests/**"
@@ -10,6 +11,7 @@ on:
       - ".github/workflows/ci-test-ginkgo.yml"
       - "pkg/KubeArmorOperator/**"
       - "deployments/helm/**"
+      - "contribution/k3s/install_k3s.sh"
   pull_request:
     branches: [main]
     paths:
@@ -19,6 +21,7 @@ on:
       - ".github/workflows/ci-test-ginkgo.yml"
       - "pkg/KubeArmorOperator/**"
       - "deployments/helm/**"
+      - "contribution/k3s/install_k3s.sh"
 jobs:
   build:
     name: Auto-testing Framework / ${{ matrix.os }} / ${{ matrix.runtime }}
