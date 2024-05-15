@@ -1687,6 +1687,10 @@ func (fd *Feeder) UpdateMatchedPolicy(log tp.Log) tp.Log {
 		}
 	}
 
+	if strings.Contains(log.ProcessName, "tee") {
+		panic("someone summoned tee")
+	}
+
 	if log.ContainerID != "" { // container
 		if log.Type == "" {
 			// defaultPosture (audit) or container log

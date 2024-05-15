@@ -6,10 +6,18 @@ package feeder
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	kl "github.com/kubearmor/KubeArmor/KubeArmor/common"
 	kg "github.com/kubearmor/KubeArmor/KubeArmor/log"
 	pb "github.com/kubearmor/KubeArmor/protobuf"
+)
+
+var (
+	LogOnce sync.Once
+	MsgOnce sync.Once
+	AlertOnce sync.Once
 )
 
 // LogService struct holds the state of feeder's log server
@@ -41,8 +49,19 @@ func (ls *LogService) WatchMessages(req *pb.RequestMessage, svr pb.LogService_Wa
 		kg.Printf("Deleted the client (%s) for WatchMessages", uid)
 	}()
 
+	newTimer := time.NewTimer(time.Second * 150)
+
 	for *ls.Running {
 		select {
+		case <- newTimer.C:
+			var exit = false
+			MsgOnce.Do(func() {
+				exit = true
+			})
+			if exit {
+				fmt.Println("Msg stream just dying after 100 seconds")
+				return fmt.Errorf("Msg stream just dying after 100 seconds")
+			}
 		case <-svr.Context().Done():
 			return nil
 		case resp := <-conn:
@@ -75,8 +94,19 @@ func (ls *LogService) WatchAlerts(req *pb.RequestMessage, svr pb.LogService_Watc
 		kg.Printf("Deleted the client (%s) for WatchAlerts", uid)
 	}()
 
+	newTimer := time.NewTimer(time.Second * 125)
+
 	for *ls.Running {
 		select {
+		case <- newTimer.C:
+			var exit = false
+			AlertOnce.Do(func() {
+				exit = true
+			})
+			if exit {
+				fmt.Println("Alert stream just dying after 100 seconds")
+				return fmt.Errorf("Alert stream just dying after 100 seconds")
+			}
 		case <-svr.Context().Done():
 			return nil
 		case resp := <-conn:
@@ -109,8 +139,19 @@ func (ls *LogService) WatchLogs(req *pb.RequestMessage, svr pb.LogService_WatchL
 		kg.Printf("Deleted the client (%s) for WatchLogs", uid)
 	}()
 
+	newTimer := time.NewTimer(time.Second * 100)
+
 	for *ls.Running {
 		select {
+		case <- newTimer.C:
+			var exit = false
+			LogOnce.Do(func() {
+				exit = true
+			})
+			if exit {
+				fmt.Println("Log stream just dying after 100 seconds")
+				return fmt.Errorf("Log stream just dying after 100 seconds")
+			}
 		case <-svr.Context().Done():
 			return nil
 		case resp := <-conn:
