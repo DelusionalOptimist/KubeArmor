@@ -3,9 +3,10 @@ name: ci-latest-helm-chart-release
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - "deployments/helm/**"
+    branches:
+      - main
+        #paths:
+        #  - "deployments/helm/**"
 
 # Declare default permissions as read only.
 permissions: read-all
@@ -13,7 +14,7 @@ permissions: read-all
 jobs:
   publish-chart:
     name: Update Stable Helm Chart With Latest Changes
-    if: ${{ (github.repository == 'kubearmor/kubearmor') }}
+      #if: ${{ (github.repository == 'kubearmor/kubearmor') }}
     runs-on: ubuntu-20.04
     permissions:
       contents: write
@@ -30,16 +31,25 @@ jobs:
           sed -i -e "s/appVersion:.*/appVersion: $STABLE_VERSION/g" deployments/helm/*/Chart.yaml
           sed -i -e "s/version:.*/version: $STABLE_VERSION/g" deployments/helm/*/Chart.yaml
 
-      - name: Publish Helm chart
-        uses: stefanprodan/helm-gh-pages@master
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
         with:
-          # Access token which can push to a different repo in the same org
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
           charts_dir: deployments/helm
-          # repo where charts would be published
-          owner: kubearmor
-          repository: charts
-          branch: gh-pages
-          charts_url: https://kubearmor.github.io/charts
-          commit_username: "github-actions[bot]"
-          commit_email: "github-actions[bot]@users.noreply.github.com"
+        env:
+          CR_TOKEN: "${{ secrets.GH_ACCESS_TOKEN }}"
+          CR_OWNER: delusionaloptimist
+          CR_GIT_REPO: charts
+
+            #- name: Publish Helm chart
+            #  uses: stefanprodan/helm-gh-pages@master
+            #  with:
+            #    # Access token which can push to a different repo in the same org
+            #    token: ${{ secrets.GH_ACCESS_TOKEN }}
+            #    charts_dir: deployments/helm
+            #    # repo where charts would be published
+            #    owner: kubearmor
+            #    repository: charts
+            #    branch: gh-pages
+            #    charts_url: https://kubearmor.github.io/charts
+            #    commit_username: "github-actions[bot]"
+            #    commit_email: "github-actions[bot]@users.noreply.github.com"
