@@ -50,6 +50,7 @@ jobs:
           pages_branch: main
           skip_upload: true
           packages_with_index: true
+          skip_packaging: true
             #charts_url: https://kubearmor.github.io/charts
             #charts_url: https://delusionaloptimist.github.io/charts
 
