@@ -48,6 +48,8 @@ jobs:
           repository: delusionaloptimist/charts
             #branch: gh-pages
           pages_branch: main
+          skip_upload: true
+          packages_with_index: true
             #charts_url: https://kubearmor.github.io/charts
             #charts_url: https://delusionaloptimist.github.io/charts
 
