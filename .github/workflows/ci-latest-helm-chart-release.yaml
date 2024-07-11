@@ -50,7 +50,7 @@ jobs:
         uses: stefanprodan/helm-gh-pages@master
         with:
           # Access token which can push to a different repo in the same org
-          token: ${{ secrets.GH_PAT_NEW }}
+          token: ${{ secrets.GH_PAT_NEWEST }}
           charts_dir: deployments/helm
           # repo where charts would be published
           #owner: kubearmor
