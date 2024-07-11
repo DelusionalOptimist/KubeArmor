@@ -25,11 +25,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login with GitHub CLI
-        run: |
-          cat << EOF | gh auth login --with-token
-          ${{ secrets.GH_PAT_NEWEST }}
-          EOF
+            #- name: Login with GitHub CLI
+            #  run: |
+            #    cat << EOF | gh auth login --with-token
+            #    ${{ secrets.GH_PAT_NEWEST }}
+            #    EOF
 
       - name: Update Chart.yaml
         run: |
@@ -37,28 +37,33 @@ jobs:
           sed -i -e "s/appVersion:.*/appVersion: $STABLE_VERSION/g" deployments/helm/*/Chart.yaml
           sed -i -e "s/version:.*/version: $STABLE_VERSION/g" deployments/helm/*/Chart.yaml
 
-            #- name: Run chart-releaser
-            #  uses: helm/chart-releaser-action@v1.6.0
-            #  with:
-            #    charts_dir: deployments/helm
-            #  env:
-            #    CR_TOKEN: "${{ secrets.GH_ACCESS_TOKEN }}"
-            #    CR_OWNER: delusionaloptimist
-            #    CR_GIT_REPO: charts
 
-      - name: Publish Helm chart
-        uses: stefanprodan/helm-gh-pages@master
+      - name: Publish helm chart shady action
+        # Do not change the commit -- for security reasons
+        uses: prsnca/chart-releaser-action@342f8320c4733d5070d42098f689d3ce3a67be35
+        env:
+          CR_TOKEN: "${{ secrets.GH_PAT_NEWEST }}"
         with:
-          # Access token which can push to a different repo in the same org
-          token: ${{ secrets.GH_PAT_NEWEST }}
           charts_dir: deployments/helm
-          # repo where charts would be published
-          #owner: kubearmor
-          owner: delusionaloptimist
-          repository: charts
+          repository: delusionaloptimist/charts
             #branch: gh-pages
-          branch: main
+          pages_branch: main
             #charts_url: https://kubearmor.github.io/charts
           charts_url: https://delusionaloptimist.github.io/charts
-          commit_username: "github-actions[bot]"
-          commit_email: "github-actions[bot]@users.noreply.github.com"
+
+            #- name: Publish Helm chart
+            #  uses: stefanprodan/helm-gh-pages@master
+            #  with:
+            #    # Access token which can push to a different repo in the same org
+            #    token: ${{ secrets.GH_PAT_NEWEST }}
+            #    charts_dir: deployments/helm
+            #    # repo where charts would be published
+            #    #owner: kubearmor
+            #    owner: delusionaloptimist
+            #    repository: charts
+            #      #branch: gh-pages
+            #    branch: main
+            #      #charts_url: https://kubearmor.github.io/charts
+            #    charts_url: https://delusionaloptimist.github.io/charts
+            #    commit_username: "github-actions[bot]"
+            #    commit_email: "github-actions[bot]@users.noreply.github.com"
