@@ -49,7 +49,7 @@ jobs:
             #branch: gh-pages
           pages_branch: main
             #charts_url: https://kubearmor.github.io/charts
-          charts_url: https://delusionaloptimist.github.io/charts
+            #charts_url: https://delusionaloptimist.github.io/charts
 
             #- name: Publish Helm chart
             #  uses: stefanprodan/helm-gh-pages@master
