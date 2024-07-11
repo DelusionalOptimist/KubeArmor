@@ -25,11 +25,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-            #- name: Login with GitHub CLI
-            #  run: |
-            #    cat << EOF | gh auth login --with-token
-            #    ${{ secrets.GH_PAT_NEW }}
-            #    EOF
+      - name: Login with GitHub CLI
+        run: |
+          cat << EOF | gh auth login --with-token
+          ${{ secrets.GH_PAT_NEWEST }}
+          EOF
 
       - name: Update Chart.yaml
         run: |
@@ -50,7 +50,7 @@ jobs:
         uses: stefanprodan/helm-gh-pages@master
         with:
           # Access token which can push to a different repo in the same org
-          token: ${{ secrets.GITHUB_TOKEN }}
+          #token: ${{ secrets.GITHUB_TOKEN }}
           charts_dir: deployments/helm
           # repo where charts would be published
           #owner: kubearmor
