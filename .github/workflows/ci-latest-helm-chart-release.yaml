@@ -56,7 +56,8 @@ jobs:
           #owner: kubearmor
           owner: delusionaloptimist
           repository: charts
-          branch: gh-pages
+            #branch: gh-pages
+          branch: main
             #charts_url: https://kubearmor.github.io/charts
           charts_url: https://delusionaloptimist.github.io/charts
           commit_username: "github-actions[bot]"
